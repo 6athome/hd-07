@@ -6,6 +6,8 @@
   <title>PROJECT HUB | 사내 프로젝트 플랫폼</title>
   <meta name="description" content="홍보실에서 운영하는 사내 프로젝트 참여·자료·소통 플랫폼" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&display=swap');
 
@@ -151,6 +153,52 @@
     .gallery-info{padding:13px 15px}.gallery-info strong{display:block;font-size:14px}.gallery-info span{font-size:11px;color:var(--muted)}
     .empty{padding:55px;text-align:center;border:1px dashed #ccd5e6;border-radius:18px;color:#8a94a8;background:#fafbfe}
 
+
+    /* Process QA */
+    .qa-shell{background:#f7f9fd;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+    .qa-process-tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:25px 0}
+    .qa-process-tab{
+      border:1px solid #dfe6f2;background:#fff;border-radius:15px;padding:15px 12px;
+      text-align:left;font-weight:800;color:#59677f;transition:.2s
+    }
+    .qa-process-tab span{display:block;font-size:10px;color:#8a94a8;margin-bottom:5px;letter-spacing:.08em}
+    .qa-process-tab.active{background:linear-gradient(135deg,var(--navy),#153d82);color:#fff;border-color:var(--navy);box-shadow:0 12px 28px rgba(7,21,47,.14)}
+    .qa-process-tab.active span{color:#9eb9eb}
+    .qa-panel{display:grid;gap:18px}
+    .qa-upload{
+      background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px;
+      display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;
+    }
+    .qa-upload-copy h3{margin:0 0 6px;font-size:18px}.qa-upload-copy p{margin:0;color:var(--muted);font-size:12px}
+    .qa-upload-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .file-input{display:none}
+    .qa-file-name{font-size:11px;color:var(--muted);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .qa-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    .qa-kpi{background:#fff;border:1px solid var(--line);border-radius:17px;padding:18px}
+    .qa-kpi .label{font-size:11px;color:var(--muted);font-weight:800}.qa-kpi .value{font-size:26px;font-weight:800;letter-spacing:-.05em;margin-top:5px}.qa-kpi .sub{font-size:10px;color:#8c97aa;margin-top:3px}
+    .qa-grid{display:grid;grid-template-columns:1.35fr .65fr;gap:16px}
+    .qa-card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:20px}
+    .qa-card h3{font-size:16px;margin:0 0 4px}.qa-card p.help{font-size:11px;color:var(--muted);margin:0 0 16px}
+    .chart-wrap{height:310px;position:relative}.chart-wrap canvas{width:100%!important;height:100%!important}
+    .metric-table{width:100%;border-collapse:collapse;font-size:12px}.metric-table th,.metric-table td{padding:10px;border-bottom:1px solid #edf0f5;text-align:right}.metric-table th:first-child,.metric-table td:first-child{text-align:left}.metric-table th{color:#738096;font-size:10px}
+    .qa-empty{padding:45px;text-align:center;border:1px dashed #cbd5e5;border-radius:18px;color:#8290a8;background:#fbfcff}
+    .qa-report-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+    .qa-report-card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:20px}
+    .qa-report-card.full{grid-column:1/-1}
+    .qa-report-card .num{font-size:10px;font-weight:800;color:var(--blue);letter-spacing:.08em}.qa-report-card h3{margin:4px 0 12px;font-size:17px}
+    .qa-report-card textarea{width:100%;min-height:150px;border:1px solid #dce2ed;border-radius:12px;padding:12px;outline:0;background:#fbfcfe;resize:vertical}
+    .qa-report-card textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(22,93,255,.09)}
+    .qa-report-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:15px}
+    .qa-source-note{font-size:11px;color:#8792a6;padding:2px 3px}
+    @media(max-width:900px){
+      .qa-process-tabs{grid-template-columns:repeat(3,1fr)}
+      .qa-summary{grid-template-columns:repeat(2,1fr)}.qa-grid{grid-template-columns:1fr}.qa-report-grid{grid-template-columns:1fr}
+    }
+    @media(max-width:640px){
+      .qa-process-tabs{grid-template-columns:1fr 1fr}.qa-summary{grid-template-columns:1fr 1fr}
+      .qa-upload{align-items:flex-start}.qa-kpi .value{font-size:22px}
+    }
+
     /* Join */
     .join{
       position:relative;overflow:hidden;background:var(--navy);color:#fff;border-radius:28px;
@@ -200,6 +248,7 @@
     <a class="brand" href="#home"><span class="brand-mark"></span><span>PROJECT HUB</span></a>
     <div class="nav-links">
       <a href="#about">프로젝트 소개</a>
+      <a href="#processQA">프로세스QA</a>
       <a href="#boards">소통공간</a>
       <a href="#join">참여안내</a>
     </div>
@@ -243,6 +292,75 @@
       <article class="feature-card"><div class="feature-icon">02</div><h3>자유게시판</h3><p>웹진 스타일의 콘텐츠로 프로젝트 이야기를 공유하고 구성원의 의견을 나눕니다.</p></article>
       <article class="feature-card"><div class="feature-icon">03</div><h3>자료실</h3><p>기획서, 참고자료, 결과물 등 프로젝트에 필요한 파일을 한곳에서 관리합니다.</p></article>
       <article class="feature-card"><div class="feature-icon">04</div><h3>갤러리</h3><p>프로젝트 현장과 활동 모습을 이미지 중심으로 기록하고 공유합니다.</p></article>
+    </div>
+  </section>
+
+
+  <section id="processQA" class="content qa-shell">
+    <div class="section-head">
+      <div>
+        <div class="section-kicker">PROCESS QUALITY ASSURANCE</div>
+        <h2 class="section-title">프로세스QA 운영 현황</h2>
+      </div>
+      <p class="section-desc">STR, Pre-Gate, 자산화 심의, SW 검증, 업무관리 프로세스의 월별 품질지표를 분석하고 개선활동을 한 페이지에서 관리합니다.</p>
+    </div>
+
+    <div class="qa-process-tabs">
+      <button class="qa-process-tab active" data-qa-process="STR"><span>01 PROCESS</span>STR</button>
+      <button class="qa-process-tab" data-qa-process="Pre-Gate"><span>02 PROCESS</span>Pre-Gate</button>
+      <button class="qa-process-tab" data-qa-process="자산화 심의"><span>03 PROCESS</span>자산화 심의</button>
+      <button class="qa-process-tab" data-qa-process="SW 검증"><span>04 PROCESS</span>SW 검증</button>
+      <button class="qa-process-tab" data-qa-process="업무관리"><span>05 PROCESS</span>업무관리 프로세스</button>
+    </div>
+
+    <div class="qa-panel">
+      <div class="qa-upload">
+        <div class="qa-upload-copy">
+          <h3 id="qaProcessTitle">STR · 월별 품질지표 분석</h3>
+          <p>해당 프로세스의 Excel 파일을 첨부하면 월별 수치와 지표별 추이를 자동 분석합니다.</p>
+        </div>
+        <div class="qa-upload-actions">
+          <label for="qaExcelInput" class="btn btn-primary">Excel 첨부하기</label>
+          <input id="qaExcelInput" class="file-input" type="file" accept=".xlsx,.xls,.csv">
+          <span id="qaFileName" class="qa-file-name">파일을 선택하세요</span>
+        </div>
+      </div>
+
+      <div id="qaDashboard">
+        <div class="qa-empty">
+          <strong>월별 지표 데이터가 아직 없습니다.</strong><br>
+          Excel 파일을 첨부하면 이 영역에 KPI, 월별 추이, 지표별 분석표가 생성됩니다.
+        </div>
+      </div>
+
+      <div class="qa-source-note">
+        권장 Excel 형식: 첫 번째 행에 <b>월</b> 또는 <b>Month</b> 컬럼을 두고, 이후 열에 품질지표 숫자 컬럼을 배치하세요.
+        예: 월 / 처리건수 / 오류건수 / 준수율 / 리드타임.
+      </div>
+
+      <div class="qa-report-grid">
+        <article class="qa-report-card">
+          <div class="num">02 · ISSUE & ROOT CAUSE</div>
+          <h3>주요 문제사항 정의 및 원인</h3>
+          <textarea id="qaIssue" placeholder="주요 문제사항, 발생 현상, 원인 분석 결과를 직접 입력하세요."></textarea>
+        </article>
+        <article class="qa-report-card">
+          <div class="num">03 · IMPROVEMENT RESULT</div>
+          <h3>개선 활동 진행 결과 및 성과</h3>
+          <textarea id="qaResult" placeholder="진행한 개선 활동과 정량·정성적 성과를 직접 입력하세요."></textarea>
+        </article>
+        <article class="qa-report-card">
+          <div class="num">04 · NEXT PLAN</div>
+          <h3>향후 개선 계획</h3>
+          <textarea id="qaPlan" placeholder="향후 개선 과제, 담당, 일정, 목표지표 등을 직접 입력하세요."></textarea>
+        </article>
+        <article class="qa-report-card full">
+          <div class="qa-report-actions">
+            <button id="qaSaveBtn" class="btn btn-dark">입력 내용 저장</button>
+            <button id="qaClearBtn" class="btn btn-outline">현재 프로세스 내용 초기화</button>
+          </div>
+        </article>
+      </div>
     </div>
   </section>
 
@@ -575,6 +693,208 @@
     }
     $('boardContent').innerHTML=`<div class="board-list">${rows.join('')}</div>`;
   }
+
+
+  // ---------------------------------------------------------
+  // Process QA
+  // ---------------------------------------------------------
+  const QA_PROCESSES = ['STR','Pre-Gate','자산화 심의','SW 검증','업무관리'];
+  let currentQAProcess = 'STR';
+  let qaChart = null;
+  let qaWorkbookData = null;
+
+  function qaStorageKey(){ return `projectHubQA_${currentQAProcess}`; }
+
+  function loadQAInputs(){
+    const saved = JSON.parse(localStorage.getItem(qaStorageKey()) || '{}');
+    $('qaIssue').value = saved.issue || '';
+    $('qaResult').value = saved.result || '';
+    $('qaPlan').value = saved.plan || '';
+  }
+
+  function saveQAInputs(){
+    localStorage.setItem(qaStorageKey(), JSON.stringify({
+      issue:$('qaIssue').value,
+      result:$('qaResult').value,
+      plan:$('qaPlan').value,
+      savedAt:new Date().toISOString()
+    }));
+    const btn=$('qaSaveBtn');
+    const old=btn.textContent;
+    btn.textContent='저장되었습니다';
+    setTimeout(()=>btn.textContent=old,1200);
+  }
+
+  $('qaSaveBtn').addEventListener('click', saveQAInputs);
+  $('qaClearBtn').addEventListener('click', ()=>{
+    if(!confirm(`${currentQAProcess}의 2·3·4번 입력 내용을 초기화할까요?`)) return;
+    localStorage.removeItem(qaStorageKey());
+    loadQAInputs();
+  });
+
+  document.querySelectorAll('.qa-process-tab').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('.qa-process-tab').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      currentQAProcess=btn.dataset.qaProcess;
+      $('qaProcessTitle').textContent=`${currentQAProcess} · 월별 품질지표 분석`;
+      $('qaFileName').textContent='파일을 선택하세요';
+      qaWorkbookData=null;
+      loadQAInputs();
+      $('qaDashboard').innerHTML='<div class="qa-empty"><strong>월별 지표 데이터가 아직 없습니다.</strong><br>Excel 파일을 첨부하면 이 영역에 KPI, 월별 추이, 지표별 분석표가 생성됩니다.</div>';
+    });
+  });
+
+  $('qaExcelInput').addEventListener('change', async e=>{
+    const file=e.target.files[0];
+    if(!file) return;
+    $('qaFileName').textContent=file.name;
+    try{
+      const buffer=await file.arrayBuffer();
+      const workbook=XLSX.read(buffer,{type:'array'});
+      const sheetName=workbook.SheetNames[0];
+      const sheet=workbook.Sheets[sheetName];
+      const rows=XLSX.utils.sheet_to_json(sheet,{defval:null,raw:true});
+      if(!rows.length) throw new Error('첫 번째 시트에 데이터가 없습니다.');
+      qaWorkbookData=normalizeQAData(rows);
+      renderQADashboard(qaWorkbookData,file.name,sheetName);
+    }catch(err){
+      $('qaDashboard').innerHTML=`<div class="qa-empty"><strong>Excel 분석에 실패했습니다.</strong><br><small>${escapeHtml(err.message||'파일 형식을 확인해 주세요.')}</small></div>`;
+    }
+  });
+
+  function normalizeQAData(rows){
+    const keys=Object.keys(rows[0]||{});
+    if(!keys.length) throw new Error('헤더가 없는 데이터입니다.');
+
+    const monthKey=keys.find(k=>/^(월|month|date|기간|일자)$/i.test(String(k).trim()))
+      || keys.find(k=>/월|month|date|기간|일자/i.test(String(k)))
+      || keys[0];
+
+    const numericKeys=keys.filter(k=>{
+      if(k===monthKey) return false;
+      return rows.some(r=>{
+        const v=r[k];
+        return v!==null && v!=='' && Number.isFinite(Number(String(v).replace(/,/g,'')));
+      });
+    });
+
+    if(!numericKeys.length) throw new Error('숫자로 분석할 지표 컬럼을 찾지 못했습니다. 월/기간 컬럼 외에 숫자형 지표를 넣어주세요.');
+
+    const data=rows.map((r,i)=>{
+      const rawMonth=r[monthKey];
+      let month=String(rawMonth ?? `기간 ${i+1}`);
+      if(typeof rawMonth==='number'){
+        const d=XLSX.SSF.parse_date_code(rawMonth);
+        if(d) month=`${d.y}-${String(d.m).padStart(2,'0')}`;
+      }else{
+        const parsed=new Date(rawMonth);
+        if(!isNaN(parsed.getTime()) && /date|일자|기간/i.test(monthKey)){
+          month=`${parsed.getFullYear()}-${String(parsed.getMonth()+1).padStart(2,'0')}`;
+        }
+      }
+      const metrics={};
+      numericKeys.forEach(k=>{
+        const n=Number(String(r[k]??'').replace(/,/g,''));
+        metrics[k]=Number.isFinite(n)?n:null;
+      });
+      return {month,metrics};
+    }).filter(x=>Object.values(x.metrics).some(v=>v!==null));
+
+    return {monthKey,numericKeys,data};
+  }
+
+  function fmt(n){
+    if(n===null || n===undefined || Number.isNaN(n)) return '-';
+    return new Intl.NumberFormat('ko-KR',{maximumFractionDigits:2}).format(n);
+  }
+
+  function avg(arr){
+    const a=arr.filter(v=>v!==null && Number.isFinite(v));
+    return a.length ? a.reduce((s,v)=>s+v,0)/a.length : null;
+  }
+
+  function renderQADashboard(dataset,fileName,sheetName){
+    const {numericKeys,data}=dataset;
+    const firstMetric=numericKeys[0];
+    const latest=data[data.length-1];
+    const latestValues=numericKeys.map(k=>latest.metrics[k]).filter(v=>v!==null);
+    const allValues=numericKeys.flatMap(k=>data.map(r=>r.metrics[k])).filter(v=>v!==null);
+    const latestAvg=avg(latestValues);
+    const overallAvg=avg(allValues);
+
+    const kpis=numericKeys.slice(0,4).map(k=>{
+      const vals=data.map(r=>r.metrics[k]).filter(v=>v!==null);
+      const latestVal=vals[vals.length-1];
+      const prevVal=vals.length>1?vals[vals.length-2]:null;
+      let change='변동 없음';
+      if(prevVal!==null && latestVal!==null && prevVal!==0){
+        const pct=((latestVal-prevVal)/Math.abs(prevVal))*100;
+        change=`전월 대비 ${pct>=0?'+':''}${pct.toFixed(1)}%`;
+      }
+      return `<div class="qa-kpi"><div class="label">${escapeHtml(k)}</div><div class="value">${fmt(latestVal)}</div><div class="sub">${change}</div></div>`;
+    }).join('');
+
+    const tableRows=numericKeys.map(k=>{
+      const vals=data.map(r=>r.metrics[k]).filter(v=>v!==null);
+      const latestVal=vals[vals.length-1], avgVal=avg(vals), maxVal=Math.max(...vals), minVal=Math.min(...vals);
+      const prev=vals.length>1?vals[vals.length-2]:null;
+      const trend=prev!==null && latestVal!==null ? latestVal-prev : null;
+      return `<tr><td>${escapeHtml(k)}</td><td>${fmt(latestVal)}</td><td>${fmt(avgVal)}</td><td>${fmt(maxVal)}</td><td>${fmt(minVal)}</td><td>${trend===null?'-':(trend>0?'+':'')+fmt(trend)}</td></tr>`;
+    }).join('');
+
+    $('qaDashboard').innerHTML=`
+      <div class="qa-summary">
+        ${kpis}
+        <div class="qa-kpi"><div class="label">전체 지표 평균</div><div class="value">${fmt(overallAvg)}</div><div class="sub">분석 대상 전체 숫자값</div></div>
+      </div>
+      <div class="qa-grid">
+        <article class="qa-card">
+          <h3>월별 품질지표 추이</h3>
+          <p class="help">${escapeHtml(fileName)} · ${escapeHtml(sheetName)} · ${data.length}개 기간 / ${numericKeys.length}개 지표</p>
+          <div class="chart-wrap"><canvas id="qaChart"></canvas></div>
+        </article>
+        <article class="qa-card">
+          <h3>지표 현황 요약</h3>
+          <p class="help">최신값 / 평균 / 최대 / 최소 / 전기간 대비 변화</p>
+          <div style="overflow:auto">
+            <table class="metric-table">
+              <thead><tr><th>지표</th><th>최신</th><th>평균</th><th>최대</th><th>최소</th><th>변화</th></tr></thead>
+              <tbody>${tableRows}</tbody>
+            </table>
+          </div>
+        </article>
+      </div>
+    `;
+
+    const ctx=$('qaChart').getContext('2d');
+    if(qaChart) qaChart.destroy();
+    const palette=['#315cf6','#62e6c4','#f59e0b','#e2557d','#6f7bf7','#1d9bf0','#8b5cf6','#14b8a6'];
+    qaChart=new Chart(ctx,{
+      type:'line',
+      data:{
+        labels:data.map(r=>r.month),
+        datasets:numericKeys.map((k,i)=>({
+          label:k,
+          data:data.map(r=>r.metrics[k]),
+          borderColor:palette[i%palette.length],
+          backgroundColor:palette[i%palette.length],
+          tension:.3,
+          borderWidth:2,
+          pointRadius:3,
+          spanGaps:true
+        }))
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        interaction:{mode:'index',intersect:false},
+        plugins:{legend:{position:'bottom',labels:{font:{family:'Nanum Gothic',size:10}}}},
+        scales:{x:{grid:{display:false},ticks:{font:{family:'Nanum Gothic',size:10}}},y:{beginAtZero:false,ticks:{font:{family:'Nanum Gothic',size:10}}}}
+      }
+    });
+  }
+
+  loadQAInputs();
 
   // Animated hero network background
   const canvas=$('heroCanvas'), ctx=canvas.getContext('2d');
