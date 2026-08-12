@@ -190,13 +190,21 @@
     .qa-report-card textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(22,93,255,.09)}
     .qa-report-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:15px}
     .qa-source-note{font-size:11px;color:#8792a6;padding:2px 3px}
+    .qa-status-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+    .qa-status-item{background:#fbfcff;border:1px solid var(--line);border-radius:14px;padding:14px}
+    .qa-status-item .name{font-size:11px;color:var(--muted);font-weight:800}
+    .qa-status-item .count{font-size:22px;font-weight:800;margin-top:4px}
+    .qa-live-badge{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:800;color:#08775f;background:#ebfff8;border:1px solid #c8f5e7;border-radius:999px;padding:7px 10px}
+    .qa-live-badge:before{content:"";width:7px;height:7px;border-radius:50%;background:#19b58b;box-shadow:0 0 10px rgba(25,181,139,.45)}
+    .qa-refresh-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+    .qa-last-sync{font-size:11px;color:var(--muted)}
     @media(max-width:900px){
       .qa-process-tabs{grid-template-columns:repeat(3,1fr)}
       .qa-summary{grid-template-columns:repeat(2,1fr)}.qa-grid{grid-template-columns:1fr}.qa-report-grid{grid-template-columns:1fr}
     }
     @media(max-width:640px){
       .qa-process-tabs{grid-template-columns:1fr 1fr}.qa-summary{grid-template-columns:1fr 1fr}
-      .qa-upload{align-items:flex-start}.qa-kpi .value{font-size:22px}
+      .qa-upload{align-items:flex-start}.qa-kpi .value{font-size:22px}.qa-status-grid{grid-template-columns:1fr 1fr}
     }
 
     /* Join */
@@ -306,18 +314,18 @@
     </div>
 
     <div class="qa-process-tabs">
-      <button class="qa-process-tab active" data-qa-process="STR"><span>01 PROCESS</span>STR</button>
+      <button class="qa-process-tab" data-qa-process="STR"><span>01 PROCESS</span>STR</button>
       <button class="qa-process-tab" data-qa-process="Pre-Gate"><span>02 PROCESS</span>Pre-Gate</button>
       <button class="qa-process-tab" data-qa-process="자산화 심의"><span>03 PROCESS</span>자산화 심의</button>
       <button class="qa-process-tab" data-qa-process="SW 검증"><span>04 PROCESS</span>SW 검증</button>
-      <button class="qa-process-tab" data-qa-process="업무관리"><span>05 PROCESS</span>업무관리 프로세스</button>
+      <button class="qa-process-tab active" data-qa-process="업무관리"><span>05 PROCESS</span>업무관리 프로세스</button>
     </div>
 
     <div class="qa-panel">
       <div class="qa-upload">
         <div class="qa-upload-copy">
-          <h3 id="qaProcessTitle">STR · 월별 품질지표 분석</h3>
-          <p>해당 프로세스의 Excel 파일을 첨부하면 월별 수치와 지표별 추이를 자동 분석합니다.</p>
+          <h3 id="qaProcessTitle">업무관리 · Polarion 연동 현황</h3>
+          <p id="qaProcessHelp">Polarion Task_등록(Task_test) 데이터를 Supabase에서 자동으로 불러옵니다.</p>
         </div>
         <div class="qa-upload-actions">
           <label for="qaExcelInput" class="btn btn-primary">Excel 첨부하기</label>
@@ -328,14 +336,13 @@
 
       <div id="qaDashboard">
         <div class="qa-empty">
-          <strong>월별 지표 데이터가 아직 없습니다.</strong><br>
-          Excel 파일을 첨부하면 이 영역에 KPI, 월별 추이, 지표별 분석표가 생성됩니다.
+          <strong>업무관리 지표를 불러오는 중입니다.</strong><br>
+          Supabase에 동기화된 Polarion 데이터를 기준으로 대시보드를 구성합니다.
         </div>
       </div>
 
-      <div class="qa-source-note">
-        권장 Excel 형식: 첫 번째 행에 <b>월</b> 또는 <b>Month</b> 컬럼을 두고, 이후 열에 품질지표 숫자 컬럼을 배치하세요.
-        예: 월 / 처리건수 / 오류건수 / 준수율 / 리드타임.
+      <div id="qaSourceNote" class="qa-source-note">
+        업무관리 데이터 원본: Polarion ALM · project testbyhsk · Task_등록(Task_test)
       </div>
 
       <div class="qa-report-grid">
@@ -699,7 +706,7 @@
   // Process QA
   // ---------------------------------------------------------
   const QA_PROCESSES = ['STR','Pre-Gate','자산화 심의','SW 검증','업무관리'];
-  let currentQAProcess = 'STR';
+  let currentQAProcess = '업무관리';
   let qaChart = null;
   let qaWorkbookData = null;
 
@@ -733,15 +740,29 @@
   });
 
   document.querySelectorAll('.qa-process-tab').forEach(btn=>{
-    btn.addEventListener('click',()=>{
+    btn.addEventListener('click',async()=>{
       document.querySelectorAll('.qa-process-tab').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
       currentQAProcess=btn.dataset.qaProcess;
-      $('qaProcessTitle').textContent=`${currentQAProcess} · 월별 품질지표 분석`;
-      $('qaFileName').textContent='파일을 선택하세요';
-      qaWorkbookData=null;
       loadQAInputs();
-      $('qaDashboard').innerHTML='<div class="qa-empty"><strong>월별 지표 데이터가 아직 없습니다.</strong><br>Excel 파일을 첨부하면 이 영역에 KPI, 월별 추이, 지표별 분석표가 생성됩니다.</div>';
+
+      if(currentQAProcess==='업무관리'){
+        $('qaProcessTitle').textContent='업무관리 · Polarion 연동 현황';
+        $('qaProcessHelp').textContent='Polarion Task_등록(Task_test) 데이터를 Supabase에서 자동으로 불러옵니다.';
+        $('qaFileName').textContent='Polarion 자동 연동';
+        $('qaExcelInput').parentElement.classList.add('hidden');
+        $('qaSourceNote').innerHTML='업무관리 데이터 원본: <b>Polarion ALM</b> · project <b>testbyhsk</b> · Task_등록(<b>Task_test</b>)';
+        await loadWorkManagementDashboard();
+      }else{
+        $('qaProcessTitle').textContent=`${currentQAProcess} · 월별 품질지표 분석`;
+        $('qaProcessHelp').textContent='해당 프로세스의 Excel 파일을 첨부하면 월별 수치와 지표별 추이를 자동 분석합니다.';
+        $('qaExcelInput').parentElement.classList.remove('hidden');
+        $('qaFileName').textContent='파일을 선택하세요';
+        $('qaSourceNote').innerHTML='권장 Excel 형식: 첫 번째 행에 <b>월</b> 또는 <b>Month</b> 컬럼을 두고, 이후 열에 품질지표 숫자 컬럼을 배치하세요.';
+        qaWorkbookData=null;
+        if(qaChart){ qaChart.destroy(); qaChart=null; }
+        $('qaDashboard').innerHTML='<div class="qa-empty"><strong>월별 지표 데이터가 아직 없습니다.</strong><br>Excel 파일을 첨부하면 이 영역에 KPI, 월별 추이, 지표별 분석표가 생성됩니다.</div>';
+      }
     });
   });
 
@@ -766,11 +787,9 @@
   function normalizeQAData(rows){
     const keys=Object.keys(rows[0]||{});
     if(!keys.length) throw new Error('헤더가 없는 데이터입니다.');
-
     const monthKey=keys.find(k=>/^(월|month|date|기간|일자)$/i.test(String(k).trim()))
       || keys.find(k=>/월|month|date|기간|일자/i.test(String(k)))
       || keys[0];
-
     const numericKeys=keys.filter(k=>{
       if(k===monthKey) return false;
       return rows.some(r=>{
@@ -778,9 +797,7 @@
         return v!==null && v!=='' && Number.isFinite(Number(String(v).replace(/,/g,'')));
       });
     });
-
     if(!numericKeys.length) throw new Error('숫자로 분석할 지표 컬럼을 찾지 못했습니다. 월/기간 컬럼 외에 숫자형 지표를 넣어주세요.');
-
     const data=rows.map((r,i)=>{
       const rawMonth=r[monthKey];
       let month=String(rawMonth ?? `기간 ${i+1}`);
@@ -800,13 +817,12 @@
       });
       return {month,metrics};
     }).filter(x=>Object.values(x.metrics).some(v=>v!==null));
-
     return {monthKey,numericKeys,data};
   }
 
   function fmt(n){
-    if(n===null || n===undefined || Number.isNaN(n)) return '-';
-    return new Intl.NumberFormat('ko-KR',{maximumFractionDigits:2}).format(n);
+    if(n===null || n===undefined || Number.isNaN(Number(n))) return '-';
+    return new Intl.NumberFormat('ko-KR',{maximumFractionDigits:2}).format(Number(n));
   }
 
   function avg(arr){
@@ -816,13 +832,8 @@
 
   function renderQADashboard(dataset,fileName,sheetName){
     const {numericKeys,data}=dataset;
-    const firstMetric=numericKeys[0];
-    const latest=data[data.length-1];
-    const latestValues=numericKeys.map(k=>latest.metrics[k]).filter(v=>v!==null);
     const allValues=numericKeys.flatMap(k=>data.map(r=>r.metrics[k])).filter(v=>v!==null);
-    const latestAvg=avg(latestValues);
     const overallAvg=avg(allValues);
-
     const kpis=numericKeys.slice(0,4).map(k=>{
       const vals=data.map(r=>r.metrics[k]).filter(v=>v!==null);
       const latestVal=vals[vals.length-1];
@@ -834,7 +845,6 @@
       }
       return `<div class="qa-kpi"><div class="label">${escapeHtml(k)}</div><div class="value">${fmt(latestVal)}</div><div class="sub">${change}</div></div>`;
     }).join('');
-
     const tableRows=numericKeys.map(k=>{
       const vals=data.map(r=>r.metrics[k]).filter(v=>v!==null);
       const latestVal=vals[vals.length-1], avgVal=avg(vals), maxVal=Math.max(...vals), minVal=Math.min(...vals);
@@ -842,59 +852,72 @@
       const trend=prev!==null && latestVal!==null ? latestVal-prev : null;
       return `<tr><td>${escapeHtml(k)}</td><td>${fmt(latestVal)}</td><td>${fmt(avgVal)}</td><td>${fmt(maxVal)}</td><td>${fmt(minVal)}</td><td>${trend===null?'-':(trend>0?'+':'')+fmt(trend)}</td></tr>`;
     }).join('');
-
     $('qaDashboard').innerHTML=`
-      <div class="qa-summary">
-        ${kpis}
-        <div class="qa-kpi"><div class="label">전체 지표 평균</div><div class="value">${fmt(overallAvg)}</div><div class="sub">분석 대상 전체 숫자값</div></div>
-      </div>
+      <div class="qa-summary">${kpis}<div class="qa-kpi"><div class="label">전체 지표 평균</div><div class="value">${fmt(overallAvg)}</div><div class="sub">분석 대상 전체 숫자값</div></div></div>
       <div class="qa-grid">
-        <article class="qa-card">
-          <h3>월별 품질지표 추이</h3>
-          <p class="help">${escapeHtml(fileName)} · ${escapeHtml(sheetName)} · ${data.length}개 기간 / ${numericKeys.length}개 지표</p>
-          <div class="chart-wrap"><canvas id="qaChart"></canvas></div>
-        </article>
-        <article class="qa-card">
-          <h3>지표 현황 요약</h3>
-          <p class="help">최신값 / 평균 / 최대 / 최소 / 전기간 대비 변화</p>
-          <div style="overflow:auto">
-            <table class="metric-table">
-              <thead><tr><th>지표</th><th>최신</th><th>평균</th><th>최대</th><th>최소</th><th>변화</th></tr></thead>
-              <tbody>${tableRows}</tbody>
-            </table>
-          </div>
-        </article>
-      </div>
-    `;
-
+        <article class="qa-card"><h3>월별 품질지표 추이</h3><p class="help">${escapeHtml(fileName)} · ${escapeHtml(sheetName)} · ${data.length}개 기간 / ${numericKeys.length}개 지표</p><div class="chart-wrap"><canvas id="qaChart"></canvas></div></article>
+        <article class="qa-card"><h3>지표 현황 요약</h3><p class="help">최신값 / 평균 / 최대 / 최소 / 전기간 대비 변화</p><div style="overflow:auto"><table class="metric-table"><thead><tr><th>지표</th><th>최신</th><th>평균</th><th>최대</th><th>최소</th><th>변화</th></tr></thead><tbody>${tableRows}</tbody></table></div></article>
+      </div>`;
     const ctx=$('qaChart').getContext('2d');
     if(qaChart) qaChart.destroy();
     const palette=['#315cf6','#62e6c4','#f59e0b','#e2557d','#6f7bf7','#1d9bf0','#8b5cf6','#14b8a6'];
-    qaChart=new Chart(ctx,{
-      type:'line',
-      data:{
-        labels:data.map(r=>r.month),
-        datasets:numericKeys.map((k,i)=>({
-          label:k,
-          data:data.map(r=>r.metrics[k]),
-          borderColor:palette[i%palette.length],
-          backgroundColor:palette[i%palette.length],
-          tension:.3,
-          borderWidth:2,
-          pointRadius:3,
-          spanGaps:true
-        }))
-      },
-      options:{
-        responsive:true,maintainAspectRatio:false,
-        interaction:{mode:'index',intersect:false},
-        plugins:{legend:{position:'bottom',labels:{font:{family:'Nanum Gothic',size:10}}}},
-        scales:{x:{grid:{display:false},ticks:{font:{family:'Nanum Gothic',size:10}}},y:{beginAtZero:false,ticks:{font:{family:'Nanum Gothic',size:10}}}}
-      }
-    });
+    qaChart=new Chart(ctx,{type:'line',data:{labels:data.map(r=>r.month),datasets:numericKeys.map((k,i)=>({label:k,data:data.map(r=>r.metrics[k]),borderColor:palette[i%palette.length],backgroundColor:palette[i%palette.length],tension:.3,borderWidth:2,pointRadius:3,spanGaps:true}))},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{font:{family:'Nanum Gothic',size:10}}}},scales:{x:{grid:{display:false},ticks:{font:{family:'Nanum Gothic',size:10}}},y:{beginAtZero:false,ticks:{font:{family:'Nanum Gothic',size:10}}}}}});
+  }
+
+  async function loadWorkManagementDashboard(){
+    $('qaDashboard').innerHTML='<div class="qa-empty"><strong>Polarion 업무관리 지표를 불러오는 중입니다.</strong><br>Supabase의 최신 동기화 데이터를 조회합니다.</div>';
+    try{
+      const [{data:summary,error:summaryError},{data:monthly,error:monthlyError}] = await Promise.all([
+        supabaseClient.from('qa_process_summary').select('*').eq('project_id','testbyhsk').eq('work_item_type','Task_test').maybeSingle(),
+        supabaseClient.from('qa_monthly_metrics').select('*').eq('project_id','testbyhsk').eq('work_item_type','Task_test').order('metric_month',{ascending:true})
+      ]);
+      if(summaryError) throw summaryError;
+      if(monthlyError) throw monthlyError;
+      if(!summary) throw new Error('qa_process_summary 데이터가 없습니다.');
+
+      const total=Number(summary.total_count||0);
+      const closed=Number(summary.closed_count||0);
+      const completionRate=total ? (closed/total)*100 : 0;
+      const lastSync=summary.updated_at ? formatDate(summary.updated_at) : '-';
+      const statusCards=[
+        ['완료 (Closed)',summary.closed_count||0],
+        ['진행중 (In Progress)',summary.inprogress_count||0],
+        ['검토/반영 (Reflecting)',summary.reflecting_count||0],
+        ['미착수 (Open)',summary.open_count||0]
+      ].map(([name,count])=>`<div class="qa-status-item"><div class="name">${name}</div><div class="count">${fmt(count)}건</div></div>`).join('');
+      const tableRows=(monthly||[]).map(r=>`<tr><td>${String(r.metric_month).slice(0,7)}</td><td>${fmt(r.registered_count)}</td><td>${fmt(r.completed_count)}</td><td>${fmt(r.completion_rate)}%</td><td>${fmt(r.avg_required_time)}h</td><td>${fmt(r.avg_processing_days)}일</td></tr>`).join('');
+
+      $('qaDashboard').innerHTML=`
+        <div class="qa-refresh-row"><span class="qa-live-badge">POLARION SYNC</span><span class="qa-last-sync">지표 갱신: ${lastSync}</span></div>
+        <div class="qa-summary">
+          <div class="qa-kpi"><div class="label">전체 업무</div><div class="value">${fmt(total)}건</div><div class="sub">Task_등록 전체</div></div>
+          <div class="qa-kpi"><div class="label">전체 완료율</div><div class="value">${completionRate.toFixed(1)}%</div><div class="sub">Closed ${fmt(closed)}건</div></div>
+          <div class="qa-kpi"><div class="label">평균 소요시간</div><div class="value">${fmt(summary.avg_required_time)}h</div><div class="sub">입력 업무 ${fmt(summary.required_time_count)}건</div></div>
+          <div class="qa-kpi"><div class="label">평균 처리기간</div><div class="value">${fmt(summary.avg_processing_days)}일</div><div class="sub">최소 ${fmt(summary.min_processing_days)}일 · 최대 ${fmt(summary.max_processing_days)}일</div></div>
+        </div>
+        <div class="qa-grid">
+          <article class="qa-card"><h3>월별 업무 등록 · 완료 추이</h3><p class="help">Polarion startDate3 / 현재 상태 기준</p><div class="chart-wrap"><canvas id="qaChart"></canvas></div></article>
+          <article class="qa-card"><h3>상태별 업무 현황</h3><p class="help">현재 Polarion 상태 기준</p><div class="qa-status-grid">${statusCards}</div></article>
+        </div>
+        <article class="qa-card"><h3>월별 품질지표</h3><p class="help">등록 건수 · 완료 건수 · 등록월 기준 완료율 · 평균 소요시간 · 평균 처리기간</p><div style="overflow:auto"><table class="metric-table"><thead><tr><th>월</th><th>등록</th><th>완료</th><th>완료율</th><th>평균소요</th><th>평균처리</th></tr></thead><tbody>${tableRows||'<tr><td colspan="6">데이터 없음</td></tr>'}</tbody></table></div></article>`;
+
+      const chartEl=$('qaChart');
+      if(qaChart) qaChart.destroy();
+      qaChart=new Chart(chartEl.getContext('2d'),{
+        type:'line',
+        data:{labels:(monthly||[]).map(r=>String(r.metric_month).slice(0,7)),datasets:[
+          {label:'등록 건수',data:(monthly||[]).map(r=>r.registered_count),borderColor:'#315cf6',backgroundColor:'#315cf6',tension:.3,borderWidth:2,pointRadius:3},
+          {label:'완료 건수',data:(monthly||[]).map(r=>r.completed_count),borderColor:'#62e6c4',backgroundColor:'#62e6c4',tension:.3,borderWidth:2,pointRadius:3}
+        ]},
+        options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{font:{family:'Nanum Gothic',size:10}}}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}}
+      });
+    }catch(err){
+      $('qaDashboard').innerHTML=`<div class="qa-empty"><strong>업무관리 지표를 불러오지 못했습니다.</strong><br><small>${escapeHtml(err.message||'Supabase 조회 오류')}</small></div>`;
+    }
   }
 
   loadQAInputs();
+  loadWorkManagementDashboard();
 
   // Animated hero network background
   const canvas=$('heroCanvas'), ctx=canvas.getContext('2d');
