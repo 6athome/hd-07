@@ -493,6 +493,7 @@
     await refreshProfile();
     updateAuthUI();
     await loadBoard(currentBoard);
+    await loadQAInputs();
   }
 
   async function refreshProfile(){
@@ -710,33 +711,109 @@
   let qaChart = null;
   let qaWorkbookData = null;
 
-  function qaStorageKey(){ return `projectHubQA_${currentQAProcess}`; }
+  const QA_PROCESS_CODES = {
+    'STR':'STR',
+    'Pre-Gate':'PRE_GATE',
+    '자산화 심의':'ASSET_REVIEW',
+    'SW 검증':'SW_VALIDATION',
+    '업무관리':'WORK_MANAGEMENT'
+  };
 
-  function loadQAInputs(){
-    const saved = JSON.parse(localStorage.getItem(qaStorageKey()) || '{}');
-    $('qaIssue').value = saved.issue || '';
-    $('qaResult').value = saved.result || '';
-    $('qaPlan').value = saved.plan || '';
+  function currentReportPeriod(){
+    const now=new Date();
+    return {year:now.getFullYear(), month:now.getMonth()+1};
   }
 
-  function saveQAInputs(){
-    localStorage.setItem(qaStorageKey(), JSON.stringify({
-      issue:$('qaIssue').value,
-      result:$('qaResult').value,
-      plan:$('qaPlan').value,
-      savedAt:new Date().toISOString()
-    }));
+  async function loadQAInputs(){
+    $('qaIssue').value='';
+    $('qaResult').value='';
+    $('qaPlan').value='';
+
+    const {year,month}=currentReportPeriod();
+    const processCode=QA_PROCESS_CODES[currentQAProcess] || currentQAProcess;
+
+    const {data,error}=await supabaseClient
+      .from('qa_process_reports')
+      .select('problem_description,improvement_result,future_plan,updated_at')
+      .eq('process_code',processCode)
+      .eq('report_year',year)
+      .eq('report_month',month)
+      .maybeSingle();
+
+    if(error){
+      console.error('QA report load error:',error);
+      return;
+    }
+
+    if(data){
+      $('qaIssue').value=data.problem_description || '';
+      $('qaResult').value=data.improvement_result || '';
+      $('qaPlan').value=data.future_plan || '';
+    }
+  }
+
+  async function saveQAInputs(){
+    if(!currentUser){
+      openAuth('login');
+      return;
+    }
+
+    const {year,month}=currentReportPeriod();
+    const processCode=QA_PROCESS_CODES[currentQAProcess] || currentQAProcess;
     const btn=$('qaSaveBtn');
     const old=btn.textContent;
+    btn.disabled=true;
+    btn.textContent='저장 중...';
+
+    const payload={
+      process_code:processCode,
+      report_year:year,
+      report_month:month,
+      problem_description:$('qaIssue').value.trim() || null,
+      root_cause:null,
+      improvement_activity:null,
+      improvement_result:$('qaResult').value.trim() || null,
+      future_plan:$('qaPlan').value.trim() || null,
+      updated_at:new Date().toISOString()
+    };
+
+    const {error}=await supabaseClient
+      .from('qa_process_reports')
+      .upsert(payload,{onConflict:'process_code,report_year,report_month'});
+
+    btn.disabled=false;
+
+    if(error){
+      console.error('QA report save error:',error);
+      btn.textContent='저장 실패';
+      setTimeout(()=>btn.textContent=old,1800);
+      alert('QA 입력 내용을 저장하지 못했습니다. 로그인 상태와 Supabase 권한을 확인해 주세요.');
+      return;
+    }
+
     btn.textContent='저장되었습니다';
-    setTimeout(()=>btn.textContent=old,1200);
+    setTimeout(()=>btn.textContent=old,1400);
   }
 
   $('qaSaveBtn').addEventListener('click', saveQAInputs);
-  $('qaClearBtn').addEventListener('click', ()=>{
-    if(!confirm(`${currentQAProcess}의 2·3·4번 입력 내용을 초기화할까요?`)) return;
-    localStorage.removeItem(qaStorageKey());
-    loadQAInputs();
+  $('qaClearBtn').addEventListener('click', async ()=>{
+    if(!currentUser){ openAuth('login'); return; }
+    if(!confirm(`${currentQAProcess}의 이번 달 2·3·4번 입력 내용을 초기화할까요?`)) return;
+
+    const {year,month}=currentReportPeriod();
+    const processCode=QA_PROCESS_CODES[currentQAProcess] || currentQAProcess;
+    const {error}=await supabaseClient
+      .from('qa_process_reports')
+      .delete()
+      .eq('process_code',processCode)
+      .eq('report_year',year)
+      .eq('report_month',month);
+
+    if(error){
+      alert('초기화하지 못했습니다. Supabase 권한을 확인해 주세요.');
+      return;
+    }
+    await loadQAInputs();
   });
 
   document.querySelectorAll('.qa-process-tab').forEach(btn=>{
@@ -744,25 +821,11 @@
       document.querySelectorAll('.qa-process-tab').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
       currentQAProcess=btn.dataset.qaProcess;
-      loadQAInputs();
-
-      if(currentQAProcess==='업무관리'){
-        $('qaProcessTitle').textContent='업무관리 · Polarion 연동 현황';
-        $('qaProcessHelp').textContent='Polarion Task_등록(Task_test) 데이터를 Supabase에서 자동으로 불러옵니다.';
-        $('qaFileName').textContent='Polarion 자동 연동';
-        $('qaExcelInput').parentElement.classList.add('hidden');
-        $('qaSourceNote').innerHTML='업무관리 데이터 원본: <b>Polarion ALM</b> · project <b>testbyhsk</b> · Task_등록(<b>Task_test</b>)';
-        await loadWorkManagementDashboard();
-      }else{
-        $('qaProcessTitle').textContent=`${currentQAProcess} · 월별 품질지표 분석`;
-        $('qaProcessHelp').textContent='해당 프로세스의 Excel 파일을 첨부하면 월별 수치와 지표별 추이를 자동 분석합니다.';
-        $('qaExcelInput').parentElement.classList.remove('hidden');
-        $('qaFileName').textContent='파일을 선택하세요';
-        $('qaSourceNote').innerHTML='권장 Excel 형식: 첫 번째 행에 <b>월</b> 또는 <b>Month</b> 컬럼을 두고, 이후 열에 품질지표 숫자 컬럼을 배치하세요.';
-        qaWorkbookData=null;
-        if(qaChart){ qaChart.destroy(); qaChart=null; }
-        $('qaDashboard').innerHTML='<div class="qa-empty"><strong>월별 지표 데이터가 아직 없습니다.</strong><br>Excel 파일을 첨부하면 이 영역에 KPI, 월별 추이, 지표별 분석표가 생성됩니다.</div>';
-      }
+      $('qaProcessTitle').textContent=`${currentQAProcess} · 월별 품질지표 분석`;
+      $('qaFileName').textContent='파일을 선택하세요';
+      qaWorkbookData=null;
+      await loadQAInputs();
+      $('qaDashboard').innerHTML='<div class="qa-empty"><strong>월별 지표 데이터가 아직 없습니다.</strong><br>Excel 파일을 첨부하면 이 영역에 KPI, 월별 추이, 지표별 분석표가 생성됩니다.</div>';
     });
   });
 
