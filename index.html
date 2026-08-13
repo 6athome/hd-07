@@ -3,11 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PROJECT HUB | QA보고 플랫폼</title>
-  <meta name="description" content="프로세스 폴라리온 QA자료 플랫폼" />
+  <title>PROJECT HUB | 사내 프로젝트 플랫폼</title>
+  <meta name="description" content="홍보실에서 운영하는 사내 프로젝트 참여·자료·소통 플랫폼" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&display=swap');
 
@@ -207,6 +208,26 @@
       .qa-upload{align-items:flex-start}.qa-kpi .value{font-size:22px}.qa-status-grid{grid-template-columns:1fr 1fr}
     }
 
+
+    /* QA capture & repository */
+    .qa-capture-area{display:grid;gap:14px;background:#fff;border:1px solid var(--line);padding:16px}
+    .qa-capture-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:2px 2px 10px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted)}
+    .qa-capture-heading strong{font-size:16px;color:var(--text);margin-right:7px}
+    .qa-capture-heading span{letter-spacing:.04em}
+    .qa-repository{margin-top:18px;background:#fff;border:1px solid var(--line);padding:20px}
+    .qa-repository-head{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;margin-bottom:15px}
+    .qa-repository-head h3{margin:3px 0 4px;font-size:20px}
+    .qa-repository-head p{margin:0;color:var(--muted);font-size:12px}
+    .qa-repository-list{display:grid;border-top:1px solid var(--line)}
+    .qa-file-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:16px;padding:13px 8px;border-bottom:1px solid #e7edef}
+    .qa-file-main{min-width:0}
+    .qa-file-title{font-size:13px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .qa-file-meta{font-size:10px;color:var(--muted);margin-top:3px}
+    .qa-file-process{font-size:10px;font-weight:800;color:var(--blue);background:#eaf5f8;border:1px solid #cce4ea;padding:4px 7px;border-radius:2px}
+    .qa-download-btn{padding:7px 11px;font-size:11px}
+    .qa-saving-note{font-size:11px;color:var(--muted);margin-right:auto}
+    @media(max-width:640px){.qa-file-row{grid-template-columns:1fr auto}.qa-file-process{display:none}.qa-repository-head{align-items:flex-start;flex-direction:column}.qa-capture-heading{align-items:flex-start;flex-direction:column}}
+
     /* Join */
     .join{
       position:relative;overflow:hidden;background:var(--navy);color:#fff;border-radius:28px;
@@ -249,6 +270,157 @@
       .board-toolbar{align-items:flex-start;flex-direction:column}
     }
   </style>
+
+
+  <!-- Polarion-inspired visual tuning: familiar enterprise ALM palette + higher readability -->
+  <style id="polarion-visual-tuning">
+    :root{
+      --navy:#00657f;
+      --navy2:#075d73;
+      --blue:#007f9f;
+      --royal:#1687a7;
+      --sky:#49a7c1;
+      --point:#7ca51b;
+      --white:#ffffff;
+      --text:#26343d;
+      --muted:#667782;
+      --line:#d7dfe3;
+      --bg:#eef2f4;
+      --card:#ffffff;
+      --shadow:0 4px 14px rgba(37,57,68,.08);
+    }
+
+    body{background:#eef2f4;color:#26343d;line-height:1.58}
+
+    /* Polarion-like top navigation */
+    .header{
+      background:rgba(0,101,127,.97);
+      backdrop-filter:none;
+      border-bottom:1px solid #00586f;
+      box-shadow:0 2px 7px rgba(28,54,66,.18);
+    }
+    .nav{height:64px}
+    .brand{letter-spacing:-.025em}
+    .brand-mark{
+      width:32px;height:32px;border-radius:4px;
+      background:linear-gradient(135deg,#8bab22,#6f9317);
+      box-shadow:none;
+      border:1px solid rgba(255,255,255,.28)
+    }
+    .nav-links{gap:4px;color:#e9f5f8}
+    .nav-links a{padding:10px 13px;border-radius:3px;font-weight:700}
+    .nav-links a:hover{background:rgba(255,255,255,.11);color:#fff}
+    .user-chip{color:#eef8fa}
+
+    /* Buttons: flatter and denser, closer to an engineering tool */
+    .btn{border-radius:4px;padding:9px 14px;box-shadow:none!important;transition:.15s background,.15s border-color,.15s color}
+    .btn:hover{transform:none}
+    .btn-primary{background:#087d9b;color:#fff;border:1px solid #006d88}
+    .btn-primary:hover{background:#006f8c}
+    .btn-ghost{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.34)}
+    .btn-dark{background:#38515e;color:#fff;border:1px solid #314854}
+    .btn-outline{background:#fff;border:1px solid #bfcbd1;color:#36515e}
+    .btn-point{background:#7ea51c;color:#fff;border:1px solid #6f9218}
+
+    /* Hero: Polarion teal workspace rather than marketing-style navy */
+    .hero{
+      min-height:570px;
+      background:
+        linear-gradient(90deg,rgba(0,69,89,.96),rgba(0,107,134,.87) 55%,rgba(15,126,151,.74)),
+        linear-gradient(135deg,#005b73 0%,#00718e 100%);
+      border-bottom:1px solid #cbd6db;
+    }
+    .hero-canvas{opacity:.34}
+    .hero::after{background:linear-gradient(90deg,rgba(0,57,74,.44),rgba(0,73,91,.04))}
+    .hero-inner{padding:112px 24px 70px}
+    .eyebrow{
+      border-radius:3px;background:rgba(255,255,255,.10);
+      border:1px solid rgba(255,255,255,.24);color:#f0f8fa;
+      letter-spacing:.06em
+    }
+    .dot{background:#9cc42b;box-shadow:none}
+    h1{font-size:clamp(40px,6vw,66px);max-width:780px;letter-spacing:-.055em}
+    .hero h1 span{color:#d7f3fa!important}
+    .hero-copy{color:#e5f1f4;max-width:700px}
+    .stats{margin-top:42px}
+    .stat{border-radius:4px;background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.22);backdrop-filter:none}
+    .stat span{color:#d9e9ed}
+
+    /* Content density and hierarchy */
+    section.content{max-width:1260px;padding:72px 28px}
+    .section-head{margin-bottom:22px}
+    .section-kicker{color:#007d9b;letter-spacing:.09em}
+    .section-title{font-size:30px;color:#23424f;letter-spacing:-.035em}
+    .section-desc{color:#667782}
+
+    .feature-grid{gap:12px}
+    .feature-card{padding:22px;border-radius:5px;box-shadow:var(--shadow);border:1px solid #d6dfe3;min-height:170px}
+    .feature-icon{border-radius:3px;background:#e6f1f4;color:#006f8b;border-left:4px solid #7ea51c}
+    .feature-card h3{color:#2b4653}.feature-card p{color:#687b85}
+
+    .dashboard{background:#f7f9fa;border-top:1px solid #d1dade}
+    .tabs{gap:5px}
+    .tab{border-radius:3px;border-color:#c9d3d8;color:#506772;padding:8px 13px;background:#f8fafb}
+    .tab.active{background:#006f8b;color:#fff;border-color:#00657f}
+    .board-title{color:#294854}
+    .post{border-radius:4px;border-color:#d4dde1;padding:17px 18px;box-shadow:none}
+    .post:hover{box-shadow:0 3px 10px rgba(41,66,77,.08);transform:none;border-color:#bccad0}
+    .post-type{color:#007f9f}
+    .thumb,.gallery-img{background:#e9eff2}
+    .thumb{border-radius:3px}.gallery-card{border-radius:4px;border-color:#d4dde1}
+    .empty{border-radius:4px;background:#f9fbfc;border-color:#c6d2d8}
+
+    /* Process QA: dashboard-first, clear contrasts */
+    .qa-shell{background:#eef2f4;border-top:1px solid #cdd7dc;border-bottom:1px solid #cdd7dc}
+    .qa-process-tabs{gap:6px;margin:20px 0}
+    .qa-process-tab{
+      border-radius:4px;padding:13px 12px;border-color:#c8d2d7;
+      color:#526872;background:#f9fbfc
+    }
+    .qa-process-tab:hover{border-color:#87aab8;background:#f2f7f9}
+    .qa-process-tab.active{
+      background:#006f8b;color:#fff;border-color:#005d76;
+      box-shadow:inset 4px 0 0 #9cc42b
+    }
+    .qa-process-tab.active span{color:#d7edf2}
+    .qa-upload,.qa-kpi,.qa-card,.qa-report-card{border-radius:4px;border-color:#cfd9de;box-shadow:0 2px 7px rgba(37,57,68,.055)}
+    .qa-upload{padding:18px 20px}
+    .qa-summary{gap:9px}
+    .qa-kpi{padding:16px;border-top:3px solid #1687a7}
+    .qa-kpi .label{font-size:11px;color:#5a707b}
+    .qa-kpi .value{font-size:25px;color:#203d49}
+    .qa-kpi .sub{color:#7a8990}
+    .qa-card{padding:18px}
+    .qa-card h3{color:#274955}
+    .metric-table{font-size:12px}
+    .metric-table th{background:#eef3f5;color:#506772;border-bottom:1px solid #cbd5da;white-space:nowrap}
+    .metric-table td{border-bottom:1px solid #e3e9ec}
+    .metric-table tbody tr:hover{background:#f4f8f9}
+    .qa-report-grid{gap:10px}
+    .qa-report-card .num{color:#007f9f}
+    .qa-report-card textarea{border-radius:3px;background:#fff;border-color:#cbd5da;line-height:1.6}
+    .qa-report-card textarea:focus,.field input:focus,.field textarea:focus,.field select:focus{border-color:#1687a7;box-shadow:0 0 0 2px rgba(22,135,167,.12)}
+    .qa-status-item{border-radius:3px;background:#f7fafb;border-color:#d4dde1}
+    .qa-live-badge{border-radius:3px;color:#557316;background:#f4f9e8;border-color:#cfdfa5}
+    .qa-live-badge:before{background:#7ea51c;box-shadow:none}
+
+    .join{border-radius:6px;background:#00657f;box-shadow:0 7px 20px rgba(35,67,80,.14)}
+    .join::before{background:rgba(126,165,28,.38)}
+    .join p{color:#e0eff3}
+    footer{background:#31454f;color:#c7d2d7}
+
+    .modal{background:rgba(27,44,51,.56);backdrop-filter:blur(2px)}
+    .modal-card{border-radius:5px;padding:25px;border:1px solid #bdcbd1;box-shadow:0 18px 50px rgba(27,44,51,.23)}
+    .close{border-radius:3px}
+    .field input,.field textarea,.field select{border-radius:3px;background:#fff;border-color:#c8d3d8}
+    .notice{border-radius:3px;background:#e8f3f7;color:#12627a}
+
+    @media(max-width:640px){
+      .nav{height:60px}.hero{min-height:620px}.hero-inner{padding-top:100px}
+      section.content{padding:56px 18px}
+    }
+  </style>
+
 </head>
 <body>
 <header class="header">
@@ -273,7 +445,7 @@
     <canvas id="heroCanvas" class="hero-canvas"></canvas>
     <div class="hero-inner">
       <div class="eyebrow"><span class="dot"></span> INTERNAL PROJECT PLATFORM</div>
-      <h1>프로세스&기능안전파트,<br><span style="color:#8eb3ff">공유</span> 프로젝트.</h1>
+      <h1>프로세스 &amp; 기능안전<br><span style="color:#bfe8ef">공유 프로젝트</span></h1>
       <p class="hero-copy">
         폴라리온 기반 대시보드 프로젝트 HUB입니다.
         프로젝트 소식과 자료를 한곳에서 확인하고, 구성원이 직접 참여하고 아이디어를 나눌 수 있습니다.
@@ -287,19 +459,6 @@
         <div class="stat"><strong>01</strong><span>통합 프로젝트 HUB</span></div>
         <div class="stat"><strong>∞</strong><span>아이디어 & 자료 공유</span></div>
       </div>
-    </div>
-  </section>
-
-  <section id="about" class="content">
-    <div class="section-head">
-      <div><div class="section-kicker">PROJECT HUB</div><h2 class="section-title">프로젝트의 모든 흐름을 한곳에서</h2></div>
-      <p class="section-desc">공지부터 자료 공유, 프로젝트 스토리와 현장 이미지까지 목적에 맞는 공간으로 구성했습니다.</p>
-    </div>
-    <div class="feature-grid">
-      <article class="feature-card"><div class="feature-icon">01</div><h3>공지사항</h3><p>프로젝트 일정, 주요 변경사항, 참여자에게 전달할 공식 안내를 빠르게 확인합니다.</p></article>
-      <article class="feature-card"><div class="feature-icon">02</div><h3>자유게시판</h3><p>웹진 스타일의 콘텐츠로 프로젝트 이야기를 공유하고 구성원의 의견을 나눕니다.</p></article>
-      <article class="feature-card"><div class="feature-icon">03</div><h3>자료실</h3><p>기획서, 참고자료, 결과물 등 프로젝트에 필요한 파일을 한곳에서 관리합니다.</p></article>
-      <article class="feature-card"><div class="feature-icon">04</div><h3>갤러리</h3><p>프로젝트 현장과 활동 모습을 이미지 중심으로 기록하고 공유합니다.</p></article>
     </div>
   </section>
 
@@ -334,6 +493,11 @@
         </div>
       </div>
 
+      <div id="qaCaptureArea" class="qa-capture-area">
+      <div class="qa-capture-heading">
+        <div><strong id="qaCaptureProcess">업무관리</strong><span> PROCESS QUALITY ASSURANCE REPORT</span></div>
+        <span id="qaCaptureDate"></span>
+      </div>
       <div id="qaDashboard">
         <div class="qa-empty">
           <strong>업무관리 지표를 불러오는 중입니다.</strong><br>
@@ -361,13 +525,43 @@
           <h3>향후 개선 계획</h3>
           <textarea id="qaPlan" placeholder="향후 개선 과제, 담당, 일정, 목표지표 등을 직접 입력하세요."></textarea>
         </article>
-        <article class="qa-report-card full">
+      </div>
+      </div>
+
+        <article class="qa-report-card full qa-action-card">
           <div class="qa-report-actions">
             <button id="qaSaveBtn" class="btn btn-dark">입력 내용 저장</button>
             <button id="qaClearBtn" class="btn btn-outline">현재 프로세스 내용 초기화</button>
           </div>
         </article>
-      </div>
+
+      <section class="qa-repository">
+        <div class="qa-repository-head">
+          <div>
+            <div class="section-kicker">REPORT REPOSITORY</div>
+            <h3>QA 보고서 저장소</h3>
+            <p>입력 내용 저장 시 생성된 JPG 보고서를 로그인한 구성원이 내려받을 수 있습니다.</p>
+          </div>
+          <button id="qaRepositoryRefresh" class="btn btn-outline" type="button">목록 새로고침</button>
+        </div>
+        <div id="qaRepositoryList" class="qa-repository-list">
+          <div class="qa-empty">로그인 후 저장된 QA 보고서를 확인할 수 있습니다.</div>
+        </div>
+      </section>
+    </div>
+  </section>
+
+
+  <section id="about" class="content">
+    <div class="section-head">
+      <div><div class="section-kicker">PROJECT HUB</div><h2 class="section-title">프로젝트의 모든 흐름을 한곳에서</h2></div>
+      <p class="section-desc">공지부터 자료 공유, 프로젝트 스토리와 현장 이미지까지 목적에 맞는 공간으로 구성했습니다.</p>
+    </div>
+    <div class="feature-grid">
+      <article class="feature-card"><div class="feature-icon">01</div><h3>공지사항</h3><p>프로젝트 일정, 주요 변경사항, 참여자에게 전달할 공식 안내를 빠르게 확인합니다.</p></article>
+      <article class="feature-card"><div class="feature-icon">02</div><h3>자유게시판</h3><p>웹진 스타일의 콘텐츠로 프로젝트 이야기를 공유하고 구성원의 의견을 나눕니다.</p></article>
+      <article class="feature-card"><div class="feature-icon">03</div><h3>자료실</h3><p>기획서, 참고자료, 결과물 등 프로젝트에 필요한 파일을 한곳에서 관리합니다.</p></article>
+      <article class="feature-card"><div class="feature-icon">04</div><h3>갤러리</h3><p>프로젝트 현장과 활동 모습을 이미지 중심으로 기록하고 공유합니다.</p></article>
     </div>
   </section>
 
@@ -494,6 +688,7 @@
     updateAuthUI();
     await loadBoard(currentBoard);
     await loadQAInputs();
+    await loadQARepository();
   }
 
   async function refreshProfile(){
@@ -528,7 +723,7 @@
   $('authBtn').addEventListener('click',()=>openAuth('signup'));
   $('logoutBtn').addEventListener('click',async()=>{
     await supabaseClient.auth.signOut();
-    currentUser=null; currentProfile=null; updateAuthUI(); await loadBoard(currentBoard);
+    currentUser=null; currentProfile=null; updateAuthUI(); await loadBoard(currentBoard); await loadQARepository();
   });
   $('authSwitch').addEventListener('click',()=>openAuth(authMode==='signup'?'login':'signup'));
 
@@ -752,6 +947,141 @@
     }
   }
 
+  function safeFilePart(value=''){
+    return String(value).trim().replace(/[\\/:*?"<>|]/g,'_').replace(/\s+/g,'_') || '사용자';
+  }
+
+  function qaToday(){
+    const d=new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+
+  function updateQACaptureHeader(){
+    const p=$('qaCaptureProcess'), d=$('qaCaptureDate');
+    if(p) p.textContent=currentQAProcess;
+    if(d) d.textContent=qaToday();
+  }
+
+  async function captureQAReportJpeg(){
+    updateQACaptureHeader();
+    const source=$('qaCaptureArea');
+    if(!source) throw new Error('캡처 영역을 찾을 수 없습니다.');
+
+    const clone=source.cloneNode(true);
+    clone.id='qaCaptureClone';
+    clone.style.position='fixed';
+    clone.style.left='-20000px';
+    clone.style.top='0';
+    clone.style.width=Math.max(1050,source.scrollWidth)+'px';
+    clone.style.zIndex='9999';
+    clone.style.background='#ffffff';
+
+    const sourceTextareas=source.querySelectorAll('textarea');
+    const cloneTextareas=clone.querySelectorAll('textarea');
+    cloneTextareas.forEach((ta,i)=>{
+      const div=document.createElement('div');
+      div.className=ta.className;
+      div.style.minHeight='150px';
+      div.style.whiteSpace='pre-wrap';
+      div.style.wordBreak='break-word';
+      div.style.border='1px solid #c8d3d8';
+      div.style.padding='12px';
+      div.style.background='#fff';
+      div.textContent=sourceTextareas[i]?.value || '입력 내용 없음';
+      ta.replaceWith(div);
+    });
+
+    const sourceCanvases=source.querySelectorAll('canvas');
+    const cloneCanvases=clone.querySelectorAll('canvas');
+    cloneCanvases.forEach((canvas,i)=>{
+      const src=sourceCanvases[i];
+      if(!src) return;
+      canvas.width=src.width; canvas.height=src.height;
+      canvas.style.width=src.style.width || src.clientWidth+'px';
+      canvas.style.height=src.style.height || src.clientHeight+'px';
+      const c=canvas.getContext('2d');
+      c.drawImage(src,0,0);
+    });
+
+    document.body.appendChild(clone);
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    const canvas=await html2canvas(clone,{backgroundColor:'#ffffff',scale:1.6,useCORS:true,logging:false});
+    clone.remove();
+    const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('JPG 생성에 실패했습니다.')),'image/jpeg',0.92));
+    return blob;
+  }
+
+  async function saveQAReportSnapshot(){
+    if(!currentUser) throw new Error('로그인이 필요합니다.');
+    const displayName=currentProfile?.display_name || currentUser.email?.split('@')[0] || '사용자';
+    const date=qaToday();
+    const visibleName=`${safeFilePart(currentQAProcess)}_${date}_${safeFilePart(displayName)}.jpg`;
+    const stamp=new Date().toISOString().replace(/[:.]/g,'-');
+    const storagePath=`${currentUser.id}/${safeFilePart(currentQAProcess)}/${date}/${stamp}_${visibleName}`;
+    const blob=await captureQAReportJpeg();
+
+    const {error:uploadError}=await supabaseClient.storage
+      .from('qa-report-snapshots')
+      .upload(storagePath,blob,{contentType:'image/jpeg',upsert:false});
+    if(uploadError) throw uploadError;
+
+    const {year,month}=currentReportPeriod();
+    const processCode=QA_PROCESS_CODES[currentQAProcess] || currentQAProcess;
+    const {error:dbError}=await supabaseClient.from('qa_report_snapshots').insert({
+      process_code:processCode,
+      process_name:currentQAProcess,
+      report_year:year,
+      report_month:month,
+      report_date:date,
+      display_name:displayName,
+      user_id:currentUser.id,
+      storage_path:storagePath,
+      file_name:visibleName
+    });
+    if(dbError){
+      await supabaseClient.storage.from('qa-report-snapshots').remove([storagePath]);
+      throw dbError;
+    }
+    return visibleName;
+  }
+
+  async function loadQARepository(){
+    const box=$('qaRepositoryList');
+    if(!box) return;
+    if(!currentUser){
+      box.innerHTML='<div class="qa-empty">로그인 후 저장된 QA 보고서를 확인할 수 있습니다.</div>';
+      return;
+    }
+    box.innerHTML='<div class="qa-empty">저장된 보고서를 불러오는 중입니다...</div>';
+    const {data,error}=await supabaseClient.from('qa_report_snapshots')
+      .select('id,process_name,report_date,display_name,storage_path,file_name,created_at')
+      .order('created_at',{ascending:false}).limit(100);
+    if(error){
+      box.innerHTML=`<div class="qa-empty">저장소 목록을 불러오지 못했습니다.<br><small>${escapeHtml(error.message)}</small></div>`;
+      return;
+    }
+    if(!data?.length){
+      box.innerHTML='<div class="qa-empty">아직 저장된 QA 보고서가 없습니다.</div>';
+      return;
+    }
+    box.innerHTML=data.map(r=>`<div class="qa-file-row">
+      <div class="qa-file-main"><div class="qa-file-title">${escapeHtml(r.file_name)}</div><div class="qa-file-meta">저장자 ${escapeHtml(r.display_name||'-')} · ${formatDate(r.created_at)}</div></div>
+      <span class="qa-file-process">${escapeHtml(r.process_name||'QA')}</span>
+      <button class="btn btn-outline qa-download-btn" type="button" data-qa-path="${escapeHtml(r.storage_path)}" data-qa-name="${escapeHtml(r.file_name)}">JPG 다운로드</button>
+    </div>`).join('');
+  }
+
+  async function downloadQAReport(path,name){
+    if(!currentUser){ openAuth('login'); return; }
+    const {data,error}=await supabaseClient.storage.from('qa-report-snapshots').download(path);
+    if(error || !data){ alert('JPG 파일을 다운로드하지 못했습니다.'); return; }
+    const url=URL.createObjectURL(data);
+    const a=document.createElement('a');
+    a.href=url; a.download=name || 'qa-report.jpg';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+
   async function saveQAInputs(){
     if(!currentUser){
       openAuth('login');
@@ -781,18 +1111,29 @@
       .from('qa_process_reports')
       .upsert(payload,{onConflict:'process_code,report_year,report_month'});
 
-    btn.disabled=false;
-
     if(error){
       console.error('QA report save error:',error);
+      btn.disabled=false;
       btn.textContent='저장 실패';
       setTimeout(()=>btn.textContent=old,1800);
       alert('QA 입력 내용을 저장하지 못했습니다. 로그인 상태와 Supabase 권한을 확인해 주세요.');
       return;
     }
 
-    btn.textContent='저장되었습니다';
-    setTimeout(()=>btn.textContent=old,1400);
+    try{
+      btn.textContent='JPG 보고서 생성 중...';
+      const savedFile=await saveQAReportSnapshot();
+      await loadQARepository();
+      btn.textContent='저장 + JPG 생성 완료';
+      console.info('QA snapshot saved:',savedFile);
+    }catch(snapshotError){
+      console.error('QA snapshot save error:',snapshotError);
+      btn.textContent='내용 저장됨 · JPG 실패';
+      alert('입력 내용은 저장되었지만 JPG 보고서 저장에 실패했습니다. Supabase의 qa_report_snapshots 테이블과 qa-report-snapshots Storage 설정을 확인해 주세요.\n\n'+(snapshotError.message||''));
+    }finally{
+      btn.disabled=false;
+      setTimeout(()=>btn.textContent=old,1800);
+    }
   }
 
   $('qaSaveBtn').addEventListener('click', saveQAInputs);
@@ -821,6 +1162,7 @@
       document.querySelectorAll('.qa-process-tab').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
       currentQAProcess=btn.dataset.qaProcess;
+      updateQACaptureHeader();
       $('qaProcessTitle').textContent=`${currentQAProcess} · 월별 품질지표 분석`;
       $('qaFileName').textContent='파일을 선택하세요';
       qaWorkbookData=null;
@@ -923,7 +1265,7 @@
       </div>`;
     const ctx=$('qaChart').getContext('2d');
     if(qaChart) qaChart.destroy();
-    const palette=['#315cf6','#62e6c4','#f59e0b','#e2557d','#6f7bf7','#1d9bf0','#8b5cf6','#14b8a6'];
+    const palette=['#007f9f','#7ea51c','#54717f','#d29a22','#4e8da0','#8aa11a','#826e9e','#b56655'];
     qaChart=new Chart(ctx,{type:'line',data:{labels:data.map(r=>r.month),datasets:numericKeys.map((k,i)=>({label:k,data:data.map(r=>r.metrics[k]),borderColor:palette[i%palette.length],backgroundColor:palette[i%palette.length],tension:.3,borderWidth:2,pointRadius:3,spanGaps:true}))},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{font:{family:'Nanum Gothic',size:10}}}},scales:{x:{grid:{display:false},ticks:{font:{family:'Nanum Gothic',size:10}}},y:{beginAtZero:false,ticks:{font:{family:'Nanum Gothic',size:10}}}}}});
   }
 
@@ -969,8 +1311,8 @@
       qaChart=new Chart(chartEl.getContext('2d'),{
         type:'line',
         data:{labels:(monthly||[]).map(r=>String(r.metric_month).slice(0,7)),datasets:[
-          {label:'등록 건수',data:(monthly||[]).map(r=>r.registered_count),borderColor:'#315cf6',backgroundColor:'#315cf6',tension:.3,borderWidth:2,pointRadius:3},
-          {label:'완료 건수',data:(monthly||[]).map(r=>r.completed_count),borderColor:'#62e6c4',backgroundColor:'#62e6c4',tension:.3,borderWidth:2,pointRadius:3}
+          {label:'등록 건수',data:(monthly||[]).map(r=>r.registered_count),borderColor:'#007f9f',backgroundColor:'#007f9f',tension:.3,borderWidth:2,pointRadius:3},
+          {label:'완료 건수',data:(monthly||[]).map(r=>r.completed_count),borderColor:'#7ea51c',backgroundColor:'#7ea51c',tension:.3,borderWidth:2,pointRadius:3}
         ]},
         options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{font:{family:'Nanum Gothic',size:10}}}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}}
       });
@@ -979,8 +1321,16 @@
     }
   }
 
+  $('qaRepositoryRefresh').addEventListener('click',loadQARepository);
+  $('qaRepositoryList').addEventListener('click',e=>{
+    const btn=e.target.closest('[data-qa-path]');
+    if(btn) downloadQAReport(btn.dataset.qaPath,btn.dataset.qaName);
+  });
+
+  updateQACaptureHeader();
   loadQAInputs();
   loadWorkManagementDashboard();
+  loadQARepository();
 
   // Animated hero network background
   const canvas=$('heroCanvas'), ctx=canvas.getContext('2d');
@@ -1001,14 +1351,14 @@
     for(const p of particles){
       p.x+=p.vx;p.y+=p.vy;
       if(p.x<0||p.x>w)p.vx*=-1;if(p.y<0||p.y>h)p.vy*=-1;
-      ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle='rgba(142,179,255,.65)';ctx.fill();
+      ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle='rgba(201,236,243,.58)';ctx.fill();
     }
     for(let i=0;i<particles.length;i++){
       for(let j=i+1;j<particles.length;j++){
         const a=particles[i],b=particles[j],dx=a.x-b.x,dy=a.y-b.y,d=Math.hypot(dx,dy);
         if(d<135){
           ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
-          ctx.strokeStyle=`rgba(88,166,255,${(1-d/135)*.18})`;ctx.lineWidth=1;ctx.stroke();
+          ctx.strokeStyle=`rgba(178,224,233,${(1-d/135)*.18})`;ctx.lineWidth=1;ctx.stroke();
         }
       }
     }
