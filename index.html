@@ -427,6 +427,14 @@
       .nav{height:60px}.hero{min-height:620px}.hero-inner{padding-top:100px}
       section.content{padding:56px 18px}
     }
+  
+    /* MY QA */
+    .myqa-shell{background:#f5f8f9;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+    .myqa-head{display:flex;justify-content:space-between;gap:20px;align-items:end;margin-bottom:20px}
+    .myqa-id-box{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.myqa-id-box input{height:38px;border:1px solid #c8d4d9;border-radius:4px;padding:0 10px;min-width:180px;background:#fff}
+    .myqa-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}.myqa-kpi{background:#fff;border:1px solid var(--line);padding:18px;border-radius:5px}.myqa-kpi .label{font-size:11px;color:var(--muted);font-weight:800}.myqa-kpi .value{font-size:27px;font-weight:800;margin-top:4px}.myqa-kpi .sub{font-size:10px;color:var(--muted);margin-top:3px}
+    .myqa-card{background:#fff;border:1px solid var(--line);border-radius:5px;padding:18px}.myqa-list{display:grid;gap:8px}.myqa-row{display:grid;grid-template-columns:90px 1fr auto;gap:12px;align-items:center;padding:12px;border:1px solid #e1e7ea;background:#fff}.myqa-status{font-size:10px;font-weight:800;text-align:center;padding:6px 8px;border-radius:999px;background:#eef4f6;color:#41616c}.myqa-status.warn{background:#fff4df;color:#8b5a00}.myqa-title{font-size:13px;font-weight:800}.myqa-meta{font-size:10px;color:var(--muted);margin-top:3px}.myqa-empty{padding:30px;text-align:center;color:var(--muted);border:1px dashed #cbd5d9;background:#fff}
+    @media(max-width:800px){.myqa-summary{grid-template-columns:1fr 1fr}.myqa-row{grid-template-columns:1fr}.myqa-head{align-items:flex-start;flex-direction:column}}
   </style>
 
 </head>
@@ -436,6 +444,7 @@
     <a class="brand" href="#home" aria-label="HOME" title="HOME"><span class="brand-mark">HD</span><span class="brand-name">Polarion QA PROJECT HUB</span></a>
     <div class="nav-links">
       <a href="#about">프로젝트 소개</a>
+      <a href="#myQA">MY QA</a>
       <a href="#processQA">프로세스QA</a>
       <a href="#boards">소통공간</a>
       <a href="#join">참여안내</a>
@@ -468,6 +477,19 @@
         <div class="stat"><strong>∞</strong><span>아이디어 & 자료 공유</span></div>
       </div>
     </div>
+  </section>
+
+
+  <section id="myQA" class="content myqa-shell">
+    <div class="myqa-head">
+      <div>
+        <div class="section-kicker">MY QA</div>
+        <h2 class="section-title">내 업무 한눈에 보기</h2>
+        <p class="section-desc">로그인 계정과 Polarion 사용자 ID를 연결하면 내 업무와 확인이 필요한 항목을 한곳에서 볼 수 있습니다.</p>
+      </div>
+      <div id="myQaIdBox" class="myqa-id-box"></div>
+    </div>
+    <div id="myQaContent"><div class="myqa-empty">로그인 후 MY QA를 사용할 수 있습니다.</div></div>
   </section>
 
 
@@ -739,6 +761,7 @@
     await loadBoard(currentBoard);
     await loadQAInputs();
     await loadQARepository();
+    await loadMyQA();
   }
 
   async function refreshProfile(){
@@ -975,6 +998,64 @@
     $('boardContent').innerHTML=`<div class="board-list">${rows.join('')}</div>`;
   }
 
+
+  // ---------------------------------------------------------
+  // MY QA
+  // ---------------------------------------------------------
+  function myQaDaysSince(dateText){
+    if(!dateText) return null;
+    const d=new Date(dateText); if(Number.isNaN(d.getTime())) return null;
+    return Math.floor((Date.now()-d.getTime())/86400000);
+  }
+
+  function myQaIsThisMonth(dateText){
+    if(!dateText) return false;
+    const d=new Date(dateText), now=new Date();
+    return !Number.isNaN(d.getTime()) && d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth();
+  }
+
+  async function savePolarionUserId(){
+    if(!currentUser) return openAuth('login');
+    const input=$('polarionUserIdInput');
+    const value=(input?.value||'').trim();
+    if(!/^A\d+$/i.test(value)){ alert('Polarion User ID를 A123456 형식으로 입력해 주세요.'); return; }
+    const {error}=await supabaseClient.from('profiles').update({polarion_user_id:value.toUpperCase()}).eq('id',currentUser.id);
+    if(error){ alert('Polarion User ID 저장에 실패했습니다.\n'+error.message); return; }
+    await refreshProfile(); updateAuthUI(); await loadMyQA();
+  }
+
+  async function loadMyQA(){
+    const content=$('myQaContent'), box=$('myQaIdBox');
+    if(!content||!box) return;
+    if(!currentUser){
+      box.innerHTML='<button class="btn btn-primary" type="button" onclick="openAuth(\'login\')">로그인</button>';
+      content.innerHTML='<div class="myqa-empty">로그인 후 MY QA를 사용할 수 있습니다.</div>';
+      return;
+    }
+    const polarionId=currentProfile?.polarion_user_id || '';
+    box.innerHTML=`<span style="font-size:11px;color:var(--muted)">Polarion ID</span><input id="polarionUserIdInput" value="${escapeHtml(polarionId)}" placeholder="A123456"><button class="btn btn-outline" type="button" onclick="savePolarionUserId()">${polarionId?'변경':'연결하기'}</button>`;
+    if(!polarionId){
+      content.innerHTML='<div class="myqa-empty"><strong>Polarion 사용자 ID를 연결해 주세요.</strong><br>최초 1회 등록하면 이후 내 업무를 자동으로 불러옵니다.</div>';
+      return;
+    }
+    content.innerHTML='<div class="myqa-empty">내 Polarion 업무를 불러오는 중입니다...</div>';
+    const {data,error}=await supabaseClient.from('polarion_workitems')
+      .select('work_item_id,title,status,start_date,end_date,required_time,polarion_url,assignee_id')
+      .eq('project_id','testbyhsk').eq('work_item_type','Task_test').eq('assignee_id',polarionId)
+      .order('start_date',{ascending:false,nullsFirst:false}).limit(100);
+    if(error){ content.innerHTML=`<div class="myqa-empty">MY QA 데이터를 불러오지 못했습니다.<br><small>${escapeHtml(error.message)}</small></div>`; return; }
+    const rows=data||[];
+    const active=rows.filter(r=>String(r.status||'').toLowerCase()!=='closed');
+    const reflecting=rows.filter(r=>String(r.status||'').toLowerCase()==='reflecting');
+    const overdue=active.filter(r=>{const days=myQaDaysSince(r.start_date); return days!==null && days>=7;});
+    const completedThisMonth=rows.filter(r=>String(r.status||'').toLowerCase()==='closed' && myQaIsThisMonth(r.end_date));
+    const priority=[...overdue,...active.filter(r=>!overdue.some(o=>o.work_item_id===r.work_item_id))].slice(0,8);
+    const list=priority.length?priority.map(r=>{
+      const days=myQaDaysSince(r.start_date); const isWarn=days!==null&&days>=7;
+      return `<div class="myqa-row"><div class="myqa-status ${isWarn?'warn':''}">${isWarn?'장기 미완료':escapeHtml(r.status||'진행')}</div><div><div class="myqa-title">${escapeHtml(r.work_item_id)} · ${escapeHtml(r.title||'')}</div><div class="myqa-meta">${r.start_date?'시작 '+escapeHtml(String(r.start_date)):'시작일 없음'}${days!==null?' · '+days+'일 경과':''}</div></div><a class="btn btn-outline" href="${escapeHtml(r.polarion_url||'#')}" target="_blank" rel="noopener">Polarion 열기</a></div>`;
+    }).join(''):'<div class="myqa-empty">현재 확인이 필요한 진행 업무가 없습니다.</div>';
+    content.innerHTML=`<div class="myqa-summary"><div class="myqa-kpi"><div class="label">내 진행 업무</div><div class="value">${active.length}건</div><div class="sub">Closed 제외</div></div><div class="myqa-kpi"><div class="label">검토/반영 중</div><div class="value">${reflecting.length}건</div><div class="sub">Reflecting 상태</div></div><div class="myqa-kpi"><div class="label">장기 미완료</div><div class="value">${overdue.length}건</div><div class="sub">시작 후 7일 이상</div></div><div class="myqa-kpi"><div class="label">이번 달 완료</div><div class="value">${completedThisMonth.length}건</div><div class="sub">완료일 기준</div></div></div><div class="myqa-card"><h3 style="margin:0 0 12px">지금 확인할 업무</h3><div class="myqa-list">${list}</div></div>`;
+  }
 
   // ---------------------------------------------------------
   // Process QA
@@ -1600,6 +1681,7 @@
     await refreshProfile();
     updateAuthUI();
     await loadBoard(currentBoard);
+    await loadMyQA();
   });
   loadSession();
 </script>
