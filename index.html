@@ -1014,6 +1014,35 @@
     return !Number.isNaN(d.getTime()) && d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth();
   }
 
+  async function copyWorkItemId(button, workItemId){
+    const value=String(workItemId||'').trim();
+    if(!value) return;
+    const original=button?.textContent || 'WI ID 복사';
+    try{
+      if(navigator.clipboard && window.isSecureContext){
+        await navigator.clipboard.writeText(value);
+      }else{
+        const textarea=document.createElement('textarea');
+        textarea.value=value;
+        textarea.style.position='fixed';
+        textarea.style.left='-9999px';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand('copy');
+        textarea.remove();
+      }
+      if(button){
+        button.textContent='복사됨 ✓';
+        button.disabled=true;
+        setTimeout(()=>{button.textContent=original;button.disabled=false;},1200);
+      }
+    }catch(err){
+      console.error('WI ID copy failed:',err);
+      alert('WI ID를 복사하지 못했습니다.\n'+value);
+    }
+  }
+
   async function savePolarionUserId(){
     if(!currentUser) return openAuth('login');
     const input=$('polarionUserIdInput');
@@ -1052,7 +1081,7 @@
     const priority=[...overdue,...active.filter(r=>!overdue.some(o=>o.work_item_id===r.work_item_id))].slice(0,8);
     const list=priority.length?priority.map(r=>{
       const days=myQaDaysSince(r.start_date); const isWarn=days!==null&&days>=7;
-      return `<div class="myqa-row"><div class="myqa-status ${isWarn?'warn':''}">${isWarn?'장기 미완료':escapeHtml(r.status||'진행')}</div><div><div class="myqa-title">${escapeHtml(r.work_item_id)} · ${escapeHtml(r.title||'')}</div><div class="myqa-meta">${r.start_date?'시작 '+escapeHtml(String(r.start_date)):'시작일 없음'}${days!==null?' · '+days+'일 경과':''}</div></div><a class="btn btn-outline" href="${escapeHtml(r.polarion_url||'#')}" target="_blank" rel="noopener">Polarion 열기</a></div>`;
+      return `<div class="myqa-row"><div class="myqa-status ${isWarn?'warn':''}">${isWarn?'장기 미완료':escapeHtml(r.status||'진행')}</div><div><div class="myqa-title">${escapeHtml(r.work_item_id)} · ${escapeHtml(r.title||'')}</div><div class="myqa-meta">${r.start_date?'시작 '+escapeHtml(String(r.start_date)):'시작일 없음'}${days!==null?' · '+days+'일 경과':''}</div></div><button class="btn btn-outline" type="button" onclick="copyWorkItemId(this,'${escapeHtml(r.work_item_id)}')">WI ID 복사</button></div>`;
     }).join(''):'<div class="myqa-empty">현재 확인이 필요한 진행 업무가 없습니다.</div>';
     content.innerHTML=`<div class="myqa-summary"><div class="myqa-kpi"><div class="label">내 진행 업무</div><div class="value">${active.length}건</div><div class="sub">Closed 제외</div></div><div class="myqa-kpi"><div class="label">검토/반영 중</div><div class="value">${reflecting.length}건</div><div class="sub">Reflecting 상태</div></div><div class="myqa-kpi"><div class="label">장기 미완료</div><div class="value">${overdue.length}건</div><div class="sub">시작 후 7일 이상</div></div><div class="myqa-kpi"><div class="label">이번 달 완료</div><div class="value">${completedThisMonth.length}건</div><div class="sub">완료일 기준</div></div></div><div class="myqa-card"><h3 style="margin:0 0 12px">지금 확인할 업무</h3><div class="myqa-list">${list}</div></div>`;
   }
