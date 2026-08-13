@@ -498,7 +498,7 @@
           <!-- Excel 업로드 기능은 추후 사용을 위해 유지하되 현재 화면에서는 숨김 -->
           <input id="qaExcelInput" class="file-input" type="file" accept=".xlsx,.xls,.csv">
           <span id="qaFileName" class="qa-file-name hidden">파일을 선택하세요</span>
-          <button id="polarionRefreshBtn" class="btn btn-primary" type="button" onclick="window.location.reload()" title="Supabase에 동기화된 최신 Polarion 지표를 다시 불러옵니다.">↻ 폴라리온 데이터 새로고침</button>
+          <button id="polarionRefreshBtn" class="btn btn-primary" type="button" onclick="refreshCurrentQAProcess()" title="현재 보고 있는 프로세스의 최신 Polarion 지표를 다시 불러옵니다.">↻ 현재 프로세스 데이터 새로고침</button>
         </div>
       </div>
 
@@ -980,7 +980,9 @@
   // Process QA
   // ---------------------------------------------------------
   const QA_PROCESSES = ['STR','Pre-Gate','자산화 심의','SW 검증','업무관리'];
-  let currentQAProcess = '업무관리';
+  const QA_LAST_PROCESS_KEY = 'polarionQaLastProcess';
+  const savedQAProcess = localStorage.getItem(QA_LAST_PROCESS_KEY);
+  let currentQAProcess = QA_PROCESSES.includes(savedQAProcess) ? savedQAProcess : '업무관리';
   let qaChart = null;
   let qaWorkbookData = null;
 
@@ -995,6 +997,37 @@
   function currentReportPeriod(){
     const now=new Date();
     return {year:now.getFullYear(), month:now.getMonth()+1};
+  }
+
+  function rememberQAProcess(processName){
+    if(QA_PROCESSES.includes(processName)){
+      localStorage.setItem(QA_LAST_PROCESS_KEY,processName);
+    }
+  }
+
+  function refreshCurrentQAProcess(){
+    rememberQAProcess(currentQAProcess);
+    window.location.reload();
+  }
+
+  async function restoreCurrentQAProcess(){
+    document.querySelectorAll('.qa-process-tab').forEach(btn=>{
+      btn.classList.toggle('active',btn.dataset.qaProcess===currentQAProcess);
+    });
+    updateQACaptureHeader();
+    $('qaProcessTitle').textContent=`${currentQAProcess} · 월별 품질지표 분석`;
+    await loadQAInputs();
+
+    if(currentQAProcess==='업무관리'){
+      $('qaProcessHelp').textContent='Polarion Task_등록(Task_test) 데이터를 Supabase에서 자동으로 불러옵니다.';
+      await loadWorkManagementDashboard();
+    }else if(currentQAProcess==='자산화 심의'){
+      $('qaProcessHelp').textContent='Polarion PREEVISION · LibFunc 자산화 심의 데이터를 Supabase에서 자동으로 불러옵니다.';
+      await loadAssetReviewDashboard();
+    }else{
+      $('qaProcessHelp').textContent='해당 프로세스의 자동 지표 연동을 준비 중입니다.';
+      $('qaDashboard').innerHTML='<div class="qa-empty"><strong>월별 지표 데이터가 아직 없습니다.</strong><br>Polarion 자동 연동을 준비 중입니다.</div>';
+    }
   }
 
   async function loadQAInputs(){
@@ -1275,6 +1308,7 @@
       document.querySelectorAll('.qa-process-tab').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
       currentQAProcess=btn.dataset.qaProcess;
+      rememberQAProcess(currentQAProcess);
       updateQACaptureHeader();
       $('qaProcessTitle').textContent=`${currentQAProcess} · 월별 품질지표 분석`;
       $('qaFileName').textContent='파일을 선택하세요';
@@ -1523,8 +1557,7 @@
   });
 
   updateQACaptureHeader();
-  loadQAInputs();
-  loadWorkManagementDashboard();
+  restoreCurrentQAProcess();
   loadQARepository();
 
   // Animated hero network background
