@@ -225,6 +225,9 @@
     .qa-file-meta{font-size:10px;color:var(--muted);margin-top:3px}
     .qa-file-process{font-size:10px;font-weight:800;color:var(--blue);background:#eaf5f8;border:1px solid #cce4ea;padding:4px 7px;border-radius:2px}
     .qa-download-btn{padding:7px 11px;font-size:11px}
+    .qa-file-actions{display:flex;align-items:center;gap:7px}
+    .qa-delete-btn{padding:7px 11px;font-size:11px;background:#fff;color:#b42318;border:1px solid #f0c9c5}
+    .qa-delete-btn:hover{background:#fff5f4;border-color:#e7aaa4}
     .qa-saving-note{font-size:11px;color:var(--muted);margin-right:auto}
     @media(max-width:640px){.qa-file-row{grid-template-columns:1fr auto}.qa-file-process{display:none}.qa-repository-head{align-items:flex-start;flex-direction:column}.qa-capture-heading{align-items:flex-start;flex-direction:column}}
 
@@ -653,7 +656,48 @@
   // publishable key is intended for browser use; NEVER put a secret/service_role key here.
   const SUPABASE_URL = 'https://zwhykyilxksjnjncdxwp.supabase.co';
   const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_RM3kFXdE11V897CnAvEORQ_tvQn2kA6';
-  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+  // Supabase 요청이 사내 프록시/보안 솔루션에 의해 HTML로 치환되는 경우를
+  // 사람이 이해할 수 있는 오류로 바꿔 주고 콘솔에 진단 정보를 남깁니다.
+  const diagnosticFetch = async (input, init={}) => {
+    const response = await fetch(input, init);
+    const contentType = response.headers.get('content-type') || '';
+    const requestUrl = typeof input === 'string' ? input : (input?.url || '');
+
+    if (requestUrl.includes('/auth/v1/') && !contentType.toLowerCase().includes('application/json')) {
+      const cloned = response.clone();
+      let preview = '';
+      try { preview = (await cloned.text()).slice(0, 300); } catch (_) {}
+      console.error('[Supabase Auth] JSON이 아닌 응답 수신', {
+        url: requestUrl,
+        status: response.status,
+        contentType,
+        preview
+      });
+
+      const message = `Supabase 인증 서버가 JSON 대신 HTML 응답을 반환했습니다. ` +
+        `사내 보안망/프록시에서 *.supabase.co 인증 요청을 차단했을 가능성이 높습니다. ` +
+        `(HTTP ${response.status || '-'}, Content-Type: ${contentType || 'unknown'})`;
+
+      return new Response(JSON.stringify({
+        code: 'non_json_auth_response',
+        msg: message,
+        message
+      }), {
+        status: response.ok ? 502 : response.status,
+        statusText: response.statusText,
+        headers: {'Content-Type':'application/json'}
+      });
+    }
+
+    return response;
+  };
+
+  const supabaseClient = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_PUBLISHABLE_KEY,
+    { global: { fetch: diagnosticFetch } }
+  );
 
   const BOARD_META = {
     notice:  {label:'공지사항', type:'notice'},
@@ -732,22 +776,50 @@
     const email=$('authEmail').value.trim();
     const password=$('authPassword').value;
     const name=$('authName').value.trim();
+    const submitBtn=$('authSubmit');
+    const oldText=submitBtn.textContent;
+    submitBtn.disabled=true;
+    submitBtn.textContent=authMode==='signup' ? '가입 중...' : '로그인 중...';
 
-    if(authMode==='signup'){
-      const {data,error}=await supabaseClient.auth.signUp({
-        email,password,
-        options:{data:{display_name:name}}
-      });
-      if(error){showNotice('authNotice',error.message,'error');return}
-      if(data.session){
-        closeModal('authModal'); await loadSession();
+    try{
+      if(authMode==='signup'){
+        const {data,error}=await supabaseClient.auth.signUp({
+          email,password,
+          options:{data:{display_name:name}}
+        });
+        if(error){
+          const msg = /JSON|HTML|non_json_auth_response|Unexpected token/i.test(error.message||'')
+            ? '회원가입 요청이 사내 네트워크/보안 솔루션에 의해 차단된 것으로 보입니다. 다른 네트워크(개인영역 또는 모바일 핫스팟)에서 다시 시도해 주세요. 계속 발생하면 브라우저 개발자도구 Console의 [Supabase Auth] 오류를 확인해 주세요.'
+            : error.message;
+          showNotice('authNotice',msg,'error');
+          return;
+        }
+        if(data.session){
+          closeModal('authModal'); await loadSession();
+        }else{
+          showNotice('authNotice','가입이 완료되었습니다. 이메일 확인이 켜져 있다면 인증 메일을 확인해 주세요.','success');
+        }
       }else{
-        showNotice('authNotice','가입이 완료되었습니다. 이메일 확인이 켜져 있다면 인증 메일을 확인해 주세요.','success');
+        const {error}=await supabaseClient.auth.signInWithPassword({email,password});
+        if(error){
+          const msg = /JSON|HTML|non_json_auth_response|Unexpected token/i.test(error.message||'')
+            ? '로그인 요청이 사내 네트워크/보안 솔루션에 의해 차단된 것으로 보입니다. 개인영역 또는 다른 네트워크에서 다시 시도해 주세요.'
+            : error.message;
+          showNotice('authNotice',msg,'error');
+          return;
+        }
+        closeModal('authModal'); await loadSession();
       }
-    }else{
-      const {error}=await supabaseClient.auth.signInWithPassword({email,password});
-      if(error){showNotice('authNotice',error.message,'error');return}
-      closeModal('authModal'); await loadSession();
+    }catch(err){
+      console.error('Auth request failed:',err);
+      const raw=String(err?.message||err||'');
+      const msg=/Unexpected token|<!doctype|JSON/i.test(raw)
+        ? 'Supabase 인증 요청에서 HTML 응답이 수신되었습니다. 사내 보안망/프록시가 *.supabase.co 요청을 차단하는지 확인해 주세요.'
+        : (raw || '회원가입/로그인 중 오류가 발생했습니다.');
+      showNotice('authNotice',msg,'error');
+    }finally{
+      submitBtn.disabled=false;
+      submitBtn.textContent=oldText;
     }
   });
 
@@ -1059,7 +1131,7 @@
     }
     box.innerHTML='<div class="qa-empty">저장된 보고서를 불러오는 중입니다...</div>';
     const {data,error}=await supabaseClient.from('qa_report_snapshots')
-      .select('id,process_name,report_date,display_name,storage_path,file_name,created_at')
+      .select('id,process_name,report_date,display_name,user_id,storage_path,file_name,created_at')
       .order('created_at',{ascending:false}).limit(100);
     if(error){
       box.innerHTML=`<div class="qa-empty">저장소 목록을 불러오지 못했습니다.<br><small>${escapeHtml(error.message)}</small></div>`;
@@ -1069,11 +1141,41 @@
       box.innerHTML='<div class="qa-empty">아직 저장된 QA 보고서가 없습니다.</div>';
       return;
     }
-    box.innerHTML=data.map(r=>`<div class="qa-file-row">
-      <div class="qa-file-main"><div class="qa-file-title">${escapeHtml(r.file_name)}</div><div class="qa-file-meta">저장자 ${escapeHtml(r.display_name||'-')} · ${formatDate(r.created_at)}</div></div>
-      <span class="qa-file-process">${escapeHtml(r.process_name||'QA')}</span>
-      <button class="btn btn-outline qa-download-btn" type="button" data-qa-path="${escapeHtml(r.storage_path)}" data-qa-name="${escapeHtml(r.file_name)}">JPG 다운로드</button>
-    </div>`).join('');
+    const isAdmin=currentProfile?.role==='admin' || currentProfile?.display_name==='은지수';
+    box.innerHTML=data.map(r=>{
+      const canDelete=isAdmin || r.user_id===currentUser.id;
+      return `<div class="qa-file-row">
+        <div class="qa-file-main"><div class="qa-file-title">${escapeHtml(r.file_name)}</div><div class="qa-file-meta">저장자 ${escapeHtml(r.display_name||'-')} · ${formatDate(r.created_at)}</div></div>
+        <span class="qa-file-process">${escapeHtml(r.process_name||'QA')}</span>
+        <div class="qa-file-actions">
+          <button class="btn btn-outline qa-download-btn" type="button" data-qa-path="${escapeHtml(r.storage_path)}" data-qa-name="${escapeHtml(r.file_name)}">JPG 다운로드</button>
+          ${canDelete?`<button class="btn qa-delete-btn" type="button" data-qa-delete-id="${escapeHtml(r.id)}" data-qa-delete-path="${escapeHtml(r.storage_path)}" data-qa-delete-name="${escapeHtml(r.file_name)}">삭제</button>`:''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  async function deleteQAReport(id,path,name){
+    if(!currentUser){ openAuth('login'); return; }
+    if(!confirm(`${name || '이 보고서'}를 삭제할까요?\n삭제 후에는 복구할 수 없습니다.`)) return;
+
+    const {error:storageError}=await supabaseClient.storage
+      .from('qa-report-snapshots')
+      .remove([path]);
+    if(storageError){
+      alert('JPG 파일을 삭제하지 못했습니다. 권한을 확인해 주세요.\n\n'+storageError.message);
+      return;
+    }
+
+    const {error:dbError}=await supabaseClient.from('qa_report_snapshots')
+      .delete()
+      .eq('id',id);
+    if(dbError){
+      alert('파일은 삭제되었지만 저장소 목록 정보 삭제에 실패했습니다. 관리자에게 문의해 주세요.\n\n'+dbError.message);
+      await loadQARepository();
+      return;
+    }
+    await loadQARepository();
   }
 
   async function downloadQAReport(path,name){
@@ -1328,6 +1430,11 @@
 
   $('qaRepositoryRefresh').addEventListener('click',loadQARepository);
   $('qaRepositoryList').addEventListener('click',e=>{
+    const deleteBtn=e.target.closest('[data-qa-delete-id]');
+    if(deleteBtn){
+      deleteQAReport(deleteBtn.dataset.qaDeleteId,deleteBtn.dataset.qaDeletePath,deleteBtn.dataset.qaDeleteName);
+      return;
+    }
     const btn=e.target.closest('[data-qa-path]');
     if(btn) downloadQAReport(btn.dataset.qaPath,btn.dataset.qaName);
   });
