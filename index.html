@@ -1015,9 +1015,15 @@
     if(!currentUser) throw new Error('로그인이 필요합니다.');
     const displayName=currentProfile?.display_name || currentUser.email?.split('@')[0] || '사용자';
     const date=qaToday();
+    // 사용자에게 보이는 파일명은 한글을 유지합니다.
     const visibleName=`${safeFilePart(currentQAProcess)}_${date}_${safeFilePart(displayName)}.jpg`;
-    const stamp=new Date().toISOString().replace(/[:.]/g,'-');
-    const storagePath=`${currentUser.id}/${safeFilePart(currentQAProcess)}/${date}/${stamp}_${visibleName}`;
+
+    // Supabase Storage object key는 영문/숫자 기반으로만 생성합니다.
+    // 한글 프로세스명/사용자명이 object key에 들어가면 Invalid key가 발생할 수 있습니다.
+    const processCode=QA_PROCESS_CODES[currentQAProcess] || 'QA_PROCESS';
+    const storageSafeProcess=String(processCode).replace(/[^A-Za-z0-9_-]/g,'_');
+    const uniqueId=(crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}_${Math.random().toString(36).slice(2)}`);
+    const storagePath=`${currentUser.id}/${storageSafeProcess}/${date}/${uniqueId}.jpg`;
     const blob=await captureQAReportJpeg();
 
     const {error:uploadError}=await supabaseClient.storage
@@ -1026,7 +1032,6 @@
     if(uploadError) throw uploadError;
 
     const {year,month}=currentReportPeriod();
-    const processCode=QA_PROCESS_CODES[currentQAProcess] || currentQAProcess;
     const {error:dbError}=await supabaseClient.from('qa_report_snapshots').insert({
       process_code:processCode,
       process_name:currentQAProcess,
