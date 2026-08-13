@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PROJECT HUB | 사내 프로젝트 플랫폼</title>
+  <title>Polarion QA PROJECT HUB | 사내 프로젝트 플랫폼</title>
   <meta name="description" content="홍보실에서 운영하는 사내 프로젝트 참여·자료·소통 플랫폼" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -306,10 +306,15 @@
     .brand{letter-spacing:-.025em}
     .brand-mark{
       width:32px;height:32px;border-radius:4px;
-      background:linear-gradient(135deg,#8bab22,#6f9317);
+      background:linear-gradient(135deg,#a8c936,#86a91e);
       box-shadow:none;
-      border:1px solid rgba(255,255,255,.28)
+      border:1px solid rgba(255,255,255,.34);
+      display:grid;place-items:center;
+      color:#fff;font-family:Arial,'Nanum Gothic',sans-serif;
+      font-size:13px;font-weight:900;letter-spacing:-.04em;line-height:1
     }
+    .brand-mark:hover{background:linear-gradient(135deg,#b4d744,#91b827)}
+    .brand-name{white-space:nowrap}
     .nav-links{gap:4px;color:#e9f5f8}
     .nav-links a{padding:10px 13px;border-radius:3px;font-weight:700}
     .nav-links a:hover{background:rgba(255,255,255,.11);color:#fff}
@@ -428,7 +433,7 @@
 <body>
 <header class="header">
   <nav class="nav">
-    <a class="brand" href="#home"><span class="brand-mark"></span><span>PROJECT HUB</span></a>
+    <a class="brand" href="#home" aria-label="HOME" title="HOME"><span class="brand-mark">HD</span><span class="brand-name">Polarion QA PROJECT HUB</span></a>
     <div class="nav-links">
       <a href="#about">프로젝트 소개</a>
       <a href="#processQA">프로세스QA</a>
@@ -455,7 +460,7 @@
       </p>
       <div class="hero-buttons">
         <a href="#boards" class="btn btn-primary">프로젝트 공간 둘러보기</a>
-        <button class="btn btn-point" onclick="openAuth('signup')">프로젝트 참여하기</button>
+        <button class="btn btn-point" onclick="openAuth('signup')">회원가입하기</button>
       </div>
       <div class="stats">
         <div class="stat"><strong>04</strong><span>운영 게시판</span></div>
@@ -487,12 +492,13 @@
       <div class="qa-upload">
         <div class="qa-upload-copy">
           <h3 id="qaProcessTitle">업무관리 · Polarion 연동 현황</h3>
-          <p id="qaProcessHelp">Polarion Task_등록(Task_test) 데이터를 Supabase에서 자동으로 불러옵니다.</p>
+          <p id="qaProcessHelp">Supabase에 동기화된 Polarion Task_등록(Task_test) 최신 지표를 불러옵니다.</p>
         </div>
         <div class="qa-upload-actions">
-          <label for="qaExcelInput" class="btn btn-primary">Excel 첨부하기</label>
+          <!-- Excel 업로드 기능은 추후 사용을 위해 유지하되 현재 화면에서는 숨김 -->
           <input id="qaExcelInput" class="file-input" type="file" accept=".xlsx,.xls,.csv">
-          <span id="qaFileName" class="qa-file-name">파일을 선택하세요</span>
+          <span id="qaFileName" class="qa-file-name hidden">파일을 선택하세요</span>
+          <button id="polarionRefreshBtn" class="btn btn-primary" type="button" onclick="window.location.reload()" title="Supabase에 동기화된 최신 Polarion 지표를 다시 불러옵니다.">↻ 폴라리온 데이터 새로고침</button>
         </div>
       </div>
 
@@ -1274,7 +1280,16 @@
       $('qaFileName').textContent='파일을 선택하세요';
       qaWorkbookData=null;
       await loadQAInputs();
-      $('qaDashboard').innerHTML='<div class="qa-empty"><strong>월별 지표 데이터가 아직 없습니다.</strong><br>Excel 파일을 첨부하면 이 영역에 KPI, 월별 추이, 지표별 분석표가 생성됩니다.</div>';
+      if(currentQAProcess==='업무관리'){
+        $('qaProcessHelp').textContent='Polarion Task_등록(Task_test) 데이터를 Supabase에서 자동으로 불러옵니다.';
+        await loadWorkManagementDashboard();
+      }else if(currentQAProcess==='자산화 심의'){
+        $('qaProcessHelp').textContent='Polarion PREEVISION · LibFunc 자산화 심의 데이터를 Supabase에서 자동으로 불러옵니다.';
+        await loadAssetReviewDashboard();
+      }else{
+        $('qaProcessHelp').textContent='해당 프로세스의 자동 지표 연동을 준비 중입니다.';
+        $('qaDashboard').innerHTML='<div class="qa-empty"><strong>월별 지표 데이터가 아직 없습니다.</strong><br>Polarion 자동 연동을 준비 중입니다.</div>';
+      }
     });
   });
 
@@ -1425,6 +1440,74 @@
       });
     }catch(err){
       $('qaDashboard').innerHTML=`<div class="qa-empty"><strong>업무관리 지표를 불러오지 못했습니다.</strong><br><small>${escapeHtml(err.message||'Supabase 조회 오류')}</small></div>`;
+    }
+  }
+
+
+  async function loadAssetReviewDashboard(){
+    $('qaDashboard').innerHTML='<div class="qa-empty"><strong>Polarion 자산화 심의 지표를 불러오는 중입니다.</strong><br>Supabase의 최신 LibFunc 동기화 데이터를 조회합니다.</div>';
+    try{
+      const [{data:summary,error:summaryError},{data:monthly,error:monthlyError},{data:statuses,error:statusError}] = await Promise.all([
+        supabaseClient.from('qa_asset_review_summary').select('*').eq('project_id','PREEVISION').eq('work_item_type','LibFunc').maybeSingle(),
+        supabaseClient.from('qa_asset_review_monthly_metrics').select('*').eq('project_id','PREEVISION').eq('work_item_type','LibFunc').order('metric_month',{ascending:true}),
+        supabaseClient.from('qa_asset_review_status_counts').select('*').eq('project_id','PREEVISION').eq('work_item_type','LibFunc').order('item_count',{ascending:false})
+      ]);
+      if(summaryError) throw summaryError;
+      if(monthlyError) throw monthlyError;
+      if(statusError) throw statusError;
+      if(!summary) throw new Error('qa_asset_review_summary 데이터가 없습니다. polarion_asset_review.py를 먼저 실행해 주세요.');
+
+      const total=Number(summary.total_count||0);
+      const thisMonth=Number(summary.current_month_count||0);
+      const completed=Number(summary.completed_count||0);
+      const completionRate=Number(summary.completion_rate||0);
+      const lastSync=summary.updated_at ? formatDate(summary.updated_at) : '-';
+
+      const ASSET_STATUS_NAMES = {
+        open:'등록/초기 상태',
+        Review1:'내용 검토',
+        review1:'내용 검토',
+        Review2:'형식 검토',
+        review2:'형식 검토',
+        Review3:'최종 검토',
+        review3:'최종 검토',
+        underReview2:'심의 진행',
+        changes:'내용 수정',
+        finalReview:'내용 검토(심의후)',
+        closed1:'완료-등재',
+        closed2:'완료-반려',
+        closed3:'완료-재심의'
+      };
+      const statusName = value => ASSET_STATUS_NAMES[value] || value;
+      const statusCards=(statuses||[]).map(r=>`<div class="qa-status-item"><div class="name">${escapeHtml(statusName(r.status))}</div><div class="count">${fmt(r.item_count)}건</div></div>`).join('');
+      const tableRows=(monthly||[]).map(r=>`<tr><td>${String(r.metric_month).slice(0,7)}</td><td>${fmt(r.registered_count)}</td><td>${fmt(r.completed_count)}</td><td>${fmt(r.completion_rate)}%</td></tr>`).join('');
+
+      $('qaDashboard').innerHTML=`
+        <div class="qa-refresh-row"><span class="qa-live-badge">POLARION · LIBFUNC</span><span class="qa-last-sync">지표 갱신: ${lastSync}</span></div>
+        <div class="qa-summary">
+          <div class="qa-kpi"><div class="label">누적 심의 대상</div><div class="value">${fmt(total)}건</div><div class="sub">PREEVISION · LibFunc 전체 등록</div></div>
+          <div class="qa-kpi"><div class="label">당월 신규</div><div class="value">${fmt(thisMonth)}건</div><div class="sub">현재 월 Work Item 생성 기준</div></div>
+          <div class="qa-kpi"><div class="label">심의 완료</div><div class="value">${fmt(completed)}건</div><div class="sub">등재 · 반려 · 재심의 결과 확정</div></div>
+          <div class="qa-kpi"><div class="label">심의 완료율</div><div class="value">${completionRate.toFixed(1)}%</div><div class="sub">완료 결과 / 누적 심의 대상</div></div>
+        </div>
+        <div class="qa-grid">
+          <article class="qa-card"><h3>월별 자산화 심의 추이</h3><p class="help">Work Item 생성월 기준 · 완료는 완료-등재/반려/재심의 상태 기준</p><div class="chart-wrap"><canvas id="qaChart"></canvas></div></article>
+          <article class="qa-card"><h3>상태별 심의 현황</h3><p class="help">Polarion LibFunc 현재 상태를 업무 화면 기준 한글명으로 표시합니다.</p><div class="qa-status-grid">${statusCards||'<div class="qa-empty">상태 데이터 없음</div>'}</div></article>
+        </div>
+        <article class="qa-card"><h3>월별 품질지표</h3><p class="help">신규 등록 · 심의 완료 · 등록월 기준 완료율</p><div style="overflow:auto"><table class="metric-table"><thead><tr><th>월</th><th>신규 등록</th><th>심의 완료</th><th>완료율</th></tr></thead><tbody>${tableRows||'<tr><td colspan="4">데이터 없음</td></tr>'}</tbody></table></div></article>`;
+
+      const chartEl=$('qaChart');
+      if(qaChart) qaChart.destroy();
+      qaChart=new Chart(chartEl.getContext('2d'),{
+        type:'line',
+        data:{labels:(monthly||[]).map(r=>String(r.metric_month).slice(0,7)),datasets:[
+          {label:'신규 등록',data:(monthly||[]).map(r=>r.registered_count),borderColor:'#007f9f',backgroundColor:'#007f9f',tension:.3,borderWidth:2,pointRadius:3},
+          {label:'심의 완료',data:(monthly||[]).map(r=>r.completed_count),borderColor:'#7ea51c',backgroundColor:'#7ea51c',tension:.3,borderWidth:2,pointRadius:3}
+        ]},
+        options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{font:{family:'Nanum Gothic',size:10}}}},scales:{x:{grid:{display:false}},y:{beginAtZero:true,ticks:{precision:0}}}}
+      });
+    }catch(err){
+      $('qaDashboard').innerHTML=`<div class="qa-empty"><strong>자산화 심의 지표를 불러오지 못했습니다.</strong><br><small>${escapeHtml(err.message||'Supabase 조회 오류')}</small></div>`;
     }
   }
 
